@@ -27,7 +27,9 @@ Everything is in declaration order; these are the landmarks to search for:
 | `foeIntent` | the AI state machine (all fighters share it; temperament parameterizes it) |
 | `genFloor` | dungeon procgen: rooms + L-corridors on a 60 px tile grid → wall rects |
 | `castFloor` | who spawns on each floor (the content tables) |
-| `dungeonUpdate` | aggro/line-of-sight, leashing, healing, stairs, loot swap, level-ups |
+| `flowTo / flowDir` | BFS flow fields (Dijkstra maps) — how blocked AI paths around walls |
+| `bladeVsWalls` | swept blade-vs-stone contact + hard penetration resolution |
+| `dungeonUpdate` | aggro/line-of-sight (`losClear`), leashing, healing, stairs, loot swap, level-ups |
 | `drawFencer / drawDungeon` | all rendering (Canvas 2D, camera = `cam`) |
 
 ## Fiddling with the agents (the fighters' AI)
@@ -74,6 +76,17 @@ perception lag were reverted.
   fall guarantee.
 - **Muscles cap drive speed, not contact speed.** The `wCap` clamp only binds
   when muscles are adding speed; impulse-launched blades may exceed it.
+- **Steel never ends a frame inside stone.** `bladeVsWalls` sweeps sub-frame
+  poses AND hard-resolves any remaining penetration by rotating the blade out
+  (direction chosen once and held — re-deciding per step oscillates at
+  symmetric poses). `resolveCombat` runs a second pass because contact
+  impulses can fling a blade wallward after its own pass ran. This is also
+  what makes stabbing *through* a wall impossible — don't replace it with a
+  visual-only fix.
+- **Blocked AI walks the flow field, never the straight line.** When
+  `losClear` fails, `dungeonIntent` swaps the intent's move vector for the
+  BFS field direction (downhill to close, uphill to flee). Don't add
+  wall-feelers or steering hacks on top; fix the field.
 
 ## Testing changes
 

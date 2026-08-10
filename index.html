@@ -253,6 +253,8 @@ let pickups = [];               // {x, y, kind: 'shield'|'weapon', weapon?, take
 let dungeon = null;             // {depth, rooms, stairs: {x, y}}
 const cam = {x: 0, y: 0};
 let pendingLevels = 0, levelBtns = null;
+let gridInfo = null;            // {gw, gh, open} — the floor's walkable tiles
+let flowCache = new Map();      // target tile → BFS distance field (Dijkstra map)
 
 // ---------- Canvas ----------
 const canvas = document.getElementById('game');
@@ -690,26 +692,50 @@ function collideWalls(f) {
 }
 
 // walls turn steel: a swing that meets stone rebounds hard — narrow
-// cuts are thrust country, and a wild swing indoors is a mistake
+// cuts are thrust country, and a wild swing indoors is a mistake.
+// Swept like every other contact (fast blades tunnel through a single
+// pose check), and penetration is RESOLVED, not tolerated: steel never
+// ends a frame inside stone, so a blade can neither hide in a wall nor
+// reach through one to the fencer beyond.
 function bladeVsWalls(f) {
-  if (!walls.length || f.fallen > 0) return;
+  if (!walls.length) return;
+  const limp = f.fallen > 0;      // a dropped blade still cannot rest in stone
+  const L = f.weapon.len;
+  const reach = f.r + 6 + L + Math.max(f.ext, f.prevExt ?? 0) + 10;
+  const near = [];
+  for (const r of walls) {
+    const cx = clamp(f.x, r.x, r.x + r.w), cy = clamp(f.y, r.y, r.y + r.h);
+    if (Math.hypot(f.x - cx, f.y - cy) < reach) near.push(r);
+  }
+  if (!near.length) return;
+  const steps = Math.max(4, Math.ceil(L / 20));      // a sample every ~20px of steel
+  const penAt = (b) => {
+    for (let s = 0; s <= steps; s++) {
+      const q = 0.12 + (0.88 * s) / steps;
+      const px = b.hx + (b.tx - b.hx) * q, py = b.hy + (b.ty - b.hy) * q;
+      for (const r of near) if (pointInRect(px, py, r)) return {px, py, r};
+    }
+    return null;
+  };
   for (const off of segOffs(f)) {
-    const b = bladeOf(f, off);
-    for (const r of walls) {
-      let hit = null;
-      for (const q of [0.45, 0.7, 1]) {
-        const px = b.hx + (b.tx - b.hx) * q, py = b.hy + (b.ty - b.hy) * q;
-        if (pointInRect(px, py, r)) { hit = {px, py}; break; }
+    if (!limp) {
+      let hit = null, tC = 1;
+      for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
+        const p = penAt(bladeAt(f, t, off));
+        if (p) { hit = p; tC = t; break; }
       }
       if (!hit) continue;
+      const r = hit.r;
       const pl = hit.px - r.x, pr = r.x + r.w - hit.px, pt = hit.py - r.y, pb = r.y + r.h - hit.py;
       const m = Math.min(pl, pr, pt, pb);
       const nx = m === pl ? -1 : m === pr ? 1 : 0;
       const ny = nx ? 0 : (m === pt ? -1 : 1);
-      const speed = Math.abs(f.w) * (f.r + 6 + f.weapon.len);
+      const speed = Math.abs(f.w) * (f.r + 6 + L);
+      // rewind to just before the stone
+      const t0 = Math.max(0, tC - 1 / 6);
+      f.th = wrapAngle((f.prevTh ?? f.th) + wrapAngle(f.th - (f.prevTh ?? f.th)) * t0);
+      f.ext = (f.prevExt ?? f.ext) + (f.ext - (f.prevExt ?? f.ext)) * t0;
       if (speed > 300) {
-        f.th = f.prevTh ?? f.th;
-        f.ext = Math.min(f.ext, f.prevExt ?? f.ext);
         f.w = -f.w * 0.6;
         f.extVel = Math.min(f.extVel, -40);
         if ((f.bladeCd || 0) <= 0) {
@@ -719,11 +745,43 @@ function bladeVsWalls(f) {
           sfx.thunk();
           sparkAt(hit.px, hit.py, getCss('--steel'), 6);
         }
-      } else {
-        // resting steel on stone: ease the blade along the face
-        nudgeBlade(f, hit.px, hit.py, nx * 3, ny * 3);
       }
-      return;
+    } else if (!penAt(bladeOf(f, off))) {
+      continue;
+    }
+    // hard resolve: rotate the blade out of the stone. A spear carried
+    // into a narrow cut is FORCED to lie along it — that's the design.
+    // The direction is chosen ONCE and held (per fencer, sticky across
+    // frames): re-deciding each step oscillates at symmetric poses and
+    // never escapes. Budget 64 × 0.025 = 1.6 rad — enough to go from
+    // perpendicular-into-the-face to lying along it.
+    let dir = 0;
+    for (let iter = 0; iter < 64; iter++) {
+      const p = penAt(bladeOf(f, off));
+      if (!p) { if (iter > 0) f.resolveDir = dir; break; }
+      if (!dir) {
+        const rr = p.r;
+        const l2 = p.px - rr.x, r2 = rr.x + rr.w - p.px, t2 = p.py - rr.y, b2 = rr.y + rr.h - p.py;
+        const m2 = Math.min(l2, r2, t2, b2);
+        const nx2 = m2 === l2 ? -1 : m2 === r2 ? 1 : 0;
+        const ny2 = nx2 ? 0 : (m2 === t2 ? -1 : 1);
+        const k = -(p.py - f.y) * nx2 + (p.px - f.x) * ny2;   // which way rotation frees the point
+        dir = Math.abs(k) > 2 ? (k > 0 ? 1 : -1) : (f.resolveDir || (f.wobPhase < Math.PI ? 1 : -1));
+      }
+      f.th = wrapAngle(f.th + dir * 0.025);
+      f.ext = Math.min(f.ext, 0);
+      if (f.w * dir < 0) f.w *= 0.5;   // stop driving back into the stone
+    }
+    // cornered so no legal angle exists (a spear in a concave corner):
+    // the steel levers the BODY back out instead
+    const still = penAt(bladeOf(f, off));
+    if (still) {
+      const rr = still.r;
+      const l3 = still.px - rr.x, r3 = rr.x + rr.w - still.px, t3 = still.py - rr.y, b3 = rr.y + rr.h - still.py;
+      const m3 = Math.min(l3, r3, t3, b3);
+      const nx3 = m3 === l3 ? -1 : m3 === r3 ? 1 : 0;
+      const ny3 = nx3 ? 0 : (m3 === t3 ? -1 : 1);
+      f.vx += nx3 * 26; f.vy += ny3 * 26;
     }
   }
 }
@@ -840,6 +898,12 @@ function resolveCombat(dt) {
   for (const f of live) pairCombat(player, f, dt, false);
   for (let i = 0; i < live.length; i++)
     for (let j = i + 1; j < live.length; j++) pairCombat(live[i], live[j], dt, true);
+  // contact impulses can fling a blade into stone after its own wall
+  // pass ran — sweep the survivors back out before anything renders
+  if (walls.length) {
+    bladeVsWalls(player);
+    for (const f of live) bladeVsWalls(f);
+  }
 }
 
 function pairCombat(A, B, dt, allies) {
@@ -1250,7 +1314,8 @@ function foeIntent(me, dt) {
     if ((lowBalance || lowStamina) && dist < reach * 1.6 && (me.retreatT || 0) < 2.5) me.aiState = 'retreat';
     else if (fetchable && dist > reach && Math.random() < A.seekPickup) me.aiState = 'fetch';
     else if (player.fallen > 0) me.aiState = 'punish';
-    else if (A.charge && !A.blockBias && dist > reach * 1.1 && dist < reach * 3.2 && Math.random() < A.charge) me.aiState = 'charge';   // the pounce
+    else if (A.charge && !A.blockBias && dist > reach * 1.1 && dist < reach * 3.2 &&
+             Math.random() < A.charge && losClear(me.x, me.y, player.x, player.y)) me.aiState = 'charge';   // pounce only on a clear line
     else if (A.blockBias && !counterWindow && dist < reach * 1.6) {
       me.aiState = Math.random() < A.aggression ? 'attack'
         : (Math.random() < (A.charge || 0) ? 'charge' : 'guard');
@@ -1373,7 +1438,58 @@ function genFloor() {
       }
     }
   }
+  // keep the open grid: the AI's flow fields path over it
+  gridInfo = {gw, gh, open: new Uint8Array(gw * gh)};
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) gridInfo.open[j * gw + i] = solid[j][i] ? 0 : 1;
+  flowCache = new Map();
   return rooms;
+}
+
+// ---------- Flow fields: how the AI understands geometry ----------
+// A BFS distance field over the open tiles, from any target tile — the
+// classic roguelike Dijkstra map. Walk downhill to reach the target,
+// uphill to flee it, and you never press into a wall you can't pass.
+function flowTo(ti, tj) {
+  const {gw, gh, open} = gridInfo;
+  const key = tj * gw + ti;
+  let d = flowCache.get(key);
+  if (d) return d;
+  d = new Int16Array(gw * gh).fill(-1);
+  if (open[key]) {
+    const q = [key];
+    d[key] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h], ci = c % gw, cj = (c / gw) | 0;
+      if (ci + 1 < gw && open[c + 1] && d[c + 1] < 0) { d[c + 1] = d[c] + 1; q.push(c + 1); }
+      if (ci - 1 >= 0 && open[c - 1] && d[c - 1] < 0) { d[c - 1] = d[c] + 1; q.push(c - 1); }
+      if (cj + 1 < gh && open[c + gw] && d[c + gw] < 0) { d[c + gw] = d[c] + 1; q.push(c + gw); }
+      if (cj - 1 >= 0 && open[c - gw] && d[c - gw] < 0) { d[c - gw] = d[c] + 1; q.push(c - gw); }
+    }
+  }
+  flowCache.set(key, d);
+  return d;
+}
+
+// unit step direction along a field from (x, y): downhill toward the
+// target, or uphill away from it
+function flowDir(x, y, field, away) {
+  const {gw, gh} = gridInfo;
+  const C = DUNGEON_CELL;
+  const i = clamp(Math.floor(x / C), 0, gw - 1), j = clamp(Math.floor(y / C), 0, gh - 1);
+  const here = field[j * gw + i];
+  if (here < 0) return null;
+  let best = null, bestD = here;
+  for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const ni = i + di, nj = j + dj;
+    if (ni < 0 || nj < 0 || ni >= gw || nj >= gh) continue;
+    const v = field[nj * gw + ni];
+    if (v < 0) continue;
+    if (away ? v > bestD : v < bestD) { bestD = v; best = [ni, nj]; }
+  }
+  if (!best) return null;
+  const cx = (best[0] + 0.5) * C, cy = (best[1] + 0.5) * C;
+  const m = Math.hypot(cx - x, cy - y) || 1;
+  return {x: (cx - x) / m, y: (cy - y) / m};
 }
 
 function spawnFoe(archKey, x, y, opts = {}) {
@@ -1491,15 +1607,35 @@ function buildRun() {
 
 // dormant duelists hold their posts; woken ones fight with their kit's AI
 function dungeonIntent(me, dt) {
-  if (me.aggro) return foeIntent(me, dt);
+  if (me.aggro) {
+    const i = foeIntent(me, dt);
+    // geometry awareness: with no line to the player, straight pursuit
+    // just presses into walls — follow the flow field around them.
+    // (Closing states walk it downhill; retreats walk it uphill.)
+    const mm = Math.hypot(i.moveX, i.moveY);
+    if (mm > 0.05 && gridInfo && !losClear(me.x, me.y, player.x, player.y)) {
+      const closing = (player.x - me.x) * i.moveX + (player.y - me.y) * i.moveY > 0;
+      const field = flowTo(Math.floor(player.x / DUNGEON_CELL), Math.floor(player.y / DUNGEON_CELL));
+      const dir = flowDir(me.x, me.y, field, !closing);
+      if (dir) { i.moveX = dir.x * mm; i.moveY = dir.y * mm; i.dash = false; }
+    }
+    return i;
+  }
   const i = {burst: false, moveX: 0, moveY: 0, dash: false,
              aimX: me.x + Math.cos(me.post.facing) * 120,
              aimY: me.y + Math.sin(me.post.facing) * 120};
   const dx = me.post.x - me.x, dy = me.post.y - me.y;
   const d = Math.hypot(dx, dy);
   if (d > 30) {
-    i.moveX = dx / d; i.moveY = dy / d;
-    i.aimX = me.x + dx; i.aimY = me.y + dy;
+    let ux = dx / d, uy = dy / d;
+    // walking home around corners, not through them
+    if (gridInfo && !losClear(me.x, me.y, me.post.x, me.post.y)) {
+      const dir = flowDir(me.x, me.y,
+        flowTo(Math.floor(me.post.x / DUNGEON_CELL), Math.floor(me.post.y / DUNGEON_CELL)), false);
+      if (dir) { ux = dir.x; uy = dir.y; }
+    }
+    i.moveX = ux; i.moveY = uy;
+    i.aimX = me.x + ux * 100; i.aimY = me.y + uy * 100;
   }
   return i;
 }
