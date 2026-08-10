@@ -200,7 +200,7 @@ const WEAPONS = {
   quick: {key: 'quick', label: 'QUICKBLADE',  len: 56,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
   heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
   spear: {key: 'spear', label: 'SPEAR',       len: 100, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
-  claws: {key: 'claws', label: 'CLAWS',       len: 46,  rad: 2,   I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
+  claws: {key: 'claws', label: 'CLAWS',       len: 38,  rad: 2,   I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
   nose:  {key: 'nose',  label: 'SNOUT',       len: 26,  rad: 2,   I: 0.4,  W: 1.2, speed: 1.15, swingBal: 0.6, swingStam: 0.7,  give: 0.6, dmg: 0.5,  walk: 1, natural: true},
 };
 
@@ -1349,6 +1349,19 @@ function foeFelled(def) {
     player.level++;
     pendingLevels++;
     spawnText(player.x, player.y - 64, 'LEVEL UP', getCss('--stamina'), 1.6);
+  }
+  // clearing a room refills your wind; clearing the floor, your blood —
+  // the full clear is worth more than rushing the stairs
+  const floorClear = !foes.some(g => !g.out);
+  const roomClear = !foes.some(g => !g.out && g.group === def.group);
+  if (floorClear) {
+    player.health = player.maxHealth;
+    player.stamina = MAX_STAMINA;
+    spawnText(player.x, player.y - 84, 'FLOOR CLEAR', getCss('--health'), 1.8);
+    sfx.touche();
+  } else if (roomClear) {
+    player.stamina = MAX_STAMINA;
+    spawnText(player.x, player.y - 84, 'ROOM CLEAR', getCss('--stamina'), 1.4);
   }
 }
 
