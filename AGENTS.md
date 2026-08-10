@@ -22,8 +22,10 @@ Everything is in declaration order; these are the landmarks to search for:
 | `const ARCHETYPES` | a body + a carried weapon + an `ai` temperament, per fighter kind |
 | `armsSpd / legsMove …` | level-up multipliers (ARMS / LEGS stacks) |
 | `stepFencer` | biomechanics: the triad, movement, the blade spring, muscle impulses |
-| `pairCombat` | blade-vs-blade: swept contact search + the unified impulse collision |
+| `segSegClosest` | the capsule-capsule primitive (Ericson §5.1.9) all blade contact runs on |
+| `pairCombat` | blade-vs-blade: swept capsule search, tip-tip instability, bind ejection, the unified impulse |
 | `bladeVsBody` | shields, presses, wounds, knockback, and the kill/XP/drop path |
+| `buildSdf / sdfAt` | signed distance field to the walls (15px chamfer grid, per floor) |
 | `foeIntent` | the AI state machine (all fighters share it; temperament parameterizes it) |
 | `genFloor` | dungeon procgen: rooms + L-corridors on a 60 px tile grid → wall rects |
 | `castFloor` | who spawns on each floor (the content tables) |
@@ -63,11 +65,16 @@ perception lag were reverted.
 
 - **One impulse formula.** All blade contact resolves in `pairCombat` via the
   rigid-rod impulse (`I = 10000 × weapon.I`, lever arms, restitution 0.45).
-  Never special-case a parry or a beat; tune inertia and costs instead.
-- **Swept contact.** Blades move up to ~85 px/frame; every contact check runs
-  across sub-frame poses `[1/6 … 1]`, and near-parallel crossings are caught
-  by the `closestBlades` outer-half proximity check. Single-frame checks WILL
-  tunnel.
+  Never special-case a parry; tune inertia, radii, and costs instead.
+- **Blades are capsules, not line segments.** Contact = closest centerline
+  distance (`segSegClosest`) against the summed `weapon.rad` values, swept
+  across sub-frame poses `[1/6 … 1]` (single-frame checks WILL tunnel; blades
+  move ~85 px/frame). Two deliberate extra contact cases carry the feel:
+  **tip-tip** (two points meeting head-on take their normal along the line —
+  points deflect, they don't slide past), and **bind ejection** (dominant
+  axial sliding blends the normal toward the blade axis, the soft
+  body-compliance direction — two driving thrusts beat each other aside).
+  Don't "simplify" either away; without them thrust-fencing goes silent.
 - **Contact normals at the contact moment.** Normals are evaluated at the
   rewound pose (`bladeAt(f, tC)`), not the post-step pose; only blades
   rotating *into* contact get rewound.
@@ -77,12 +84,15 @@ perception lag were reverted.
 - **Muscles cap drive speed, not contact speed.** The `wCap` clamp only binds
   when muscles are adding speed; impulse-launched blades may exceed it.
 - **Steel never ends a frame inside stone.** `bladeVsWalls` sweeps sub-frame
-  poses AND hard-resolves any remaining penetration by rotating the blade out
-  (direction chosen once and held — re-deciding per step oscillates at
-  symmetric poses). `resolveCombat` runs a second pass because contact
-  impulses can fling a blade wallward after its own pass ran. This is also
-  what makes stabbing *through* a wall impossible — don't replace it with a
-  visual-only fix.
+  poses against the wall SDF and Newton-resolves penetration at the **first**
+  penetrating sample from the hand — the entry point. (Not the deepest: thin
+  walls have an SDF ridge mid-wall where the gradient is ambiguous or points
+  out the FAR side, i.e. through the wall.) A radially-pinned blade shoves
+  the body back instead, capped at 30px/frame. `resolveCombat` runs a second
+  pass because contact impulses can fling a blade wallward after its own pass
+  ran, and `bladeVsBody` voids any wound whose hand→contact line crosses a
+  wall. Together these make stabbing through walls impossible — don't replace
+  any layer with a visual-only fix.
 - **Blocked AI walks the flow field, never the straight line.** When
   `losClear` fails, `dungeonIntent` swaps the intent's move vector for the
   BFS field direction (downhill to close, uphill to flee). Don't add

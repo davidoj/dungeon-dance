@@ -188,13 +188,15 @@ const ROUNDS_TO_WIN = 3;
 // barely feels a clash) while light steel swung fast wrenches its OWN
 // wielder on contact; give: balance damage dealt to whoever it strikes;
 // walk: carry weight. offs: multi-segment natural weapons (claw pairs).
+// rad: the capsule radius — blades are steel with THICKNESS, and all
+// contact is capsule-vs-capsule (fat heavy blades bind a touch earlier)
 const WEAPONS = {
-  sword: {key: 'sword', label: 'SWORD',       len: 92,  I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1},
-  quick: {key: 'quick', label: 'QUICKBLADE',  len: 84,  I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
-  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 96,  I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
-  spear: {key: 'spear', label: 'SPEAR',       len: 150, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
-  claws: {key: 'claws', label: 'CLAWS',       len: 46,  I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
-  nose:  {key: 'nose',  label: 'SNOUT',       len: 26,  I: 0.4,  W: 1.2, speed: 1.15, swingBal: 0.6, swingStam: 0.7,  give: 0.6, dmg: 0.5,  walk: 1, natural: true},
+  sword: {key: 'sword', label: 'SWORD',       len: 92,  rad: 2.5, I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1},
+  quick: {key: 'quick', label: 'QUICKBLADE',  len: 84,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
+  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 96,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
+  spear: {key: 'spear', label: 'SPEAR',       len: 150, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
+  claws: {key: 'claws', label: 'CLAWS',       len: 46,  rad: 2,   I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
+  nose:  {key: 'nose',  label: 'SNOUT',       len: 26,  rad: 2,   I: 0.4,  W: 1.2, speed: 1.15, swingBal: 0.6, swingStam: 0.7,  give: 0.6, dmg: 0.5,  walk: 1, natural: true},
 };
 
 // level-ups buy CAPABILITY, never damage numbers — each stack multiplies
@@ -255,6 +257,7 @@ const cam = {x: 0, y: 0};
 let pendingLevels = 0, levelBtns = null;
 let gridInfo = null;            // {gw, gh, open} — the floor's walkable tiles
 let flowCache = new Map();      // target tile → BFS distance field (Dijkstra map)
+let sdfInfo = null;             // signed distance field to the walls (per floor)
 
 // ---------- Canvas ----------
 const canvas = document.getElementById('game');
@@ -327,7 +330,6 @@ function segCircle(ax, ay, bx, by, cx, cy, r) {
 }
 function segIntersect(p1, p2, p3, p4) {
   // true segment crossing; returns intersection point or null.
-  // blades interact when they CROSS — hovering side by side is not contact.
   const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
   const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
   const denom = d1x * d2y - d1y * d2x;
@@ -336,6 +338,30 @@ function segIntersect(p1, p2, p3, p4) {
   const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denom;
   if (s < 0 || s > 1 || u < 0 || u > 1) return null;
   return {x: p1.x + d1x * s, y: p1.y + d1y * s};
+}
+
+// closest points between two segments (Ericson, Real-Time Collision
+// Detection §5.1.9) — THE capsule-capsule primitive. Blades are steel
+// with thickness: contact is "centerline distance ≤ summed radii",
+// which makes near-parallel geometry robust instead of degenerate.
+function segSegClosest(ax, ay, bx, by, cx, cy, dx, dy) {
+  const d1x = bx - ax, d1y = by - ay;
+  const d2x = dx - cx, d2y = dy - cy;
+  const rx = ax - cx, ry = ay - cy;
+  const a = d1x * d1x + d1y * d1y;
+  const e = d2x * d2x + d2y * d2y;
+  const f = d2x * rx + d2y * ry;
+  const c = d1x * rx + d1y * ry;
+  const b = d1x * d2x + d1y * d2y;
+  const denom = a * e - b * b;
+  let s = denom > 1e-9 ? clamp((b * f - c * e) / denom, 0, 1) : 0;
+  let t = e > 1e-9 ? (b * s + f) / e : 0;
+  if (t < 0) { t = 0; s = clamp(-c / (a || 1), 0, 1); }
+  else if (t > 1) { t = 1; s = clamp((b - c) / (a || 1), 0, 1); }
+  const px = ax + d1x * s, py = ay + d1y * s;
+  const qx = cx + d2x * t, qy = cy + d2y * t;
+  const ddx = qx - px, ddy = qy - py;
+  return {d2: ddx * ddx + ddy * ddy, px, py, qx, qy, s, t};
 }
 
 // ---------- Fencer ----------
@@ -691,47 +717,107 @@ function collideWalls(f) {
   }
 }
 
+// ---------- Walls as a signed distance field ----------
+// Precomputed per floor on a 15px subgrid (two-pass chamfer transform):
+// sdfAt(x, y) ≈ distance to the nearest wall face, negative inside
+// stone, and its gradient points the way OUT. Penetration cleanup then
+// stops being casework: rotate the blade by exactly the angle that
+// clears the deepest sample, along the gradient — concave corners fall
+// out of the math (the gradient just points diagonally) instead of
+// needing sticky directions and levering hacks.
+function buildSdf() {
+  const sub = 4, cell = DUNGEON_CELL / sub;
+  const gw = gridInfo.gw * sub, gh = gridInfo.gh * sub;
+  const solidAt = (i, j) => !gridInfo.open[((j / sub) | 0) * gridInfo.gw + ((i / sub) | 0)];
+  const INF = 1e9;
+  const d = new Float32Array(gw * gh);
+  const dn = new Float32Array(gw * gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const s = solidAt(i, j);
+    d[j * gw + i] = s ? 0 : INF;    // will become: distance to stone
+    dn[j * gw + i] = s ? INF : 0;   // will become: distance to open (depth)
+  }
+  const chamfer = (arr) => {
+    const D1 = cell, D2 = cell * Math.SQRT2;
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const k = j * gw + i;
+      if (i > 0 && arr[k - 1] + D1 < arr[k]) arr[k] = arr[k - 1] + D1;
+      if (j > 0) {
+        if (arr[k - gw] + D1 < arr[k]) arr[k] = arr[k - gw] + D1;
+        if (i > 0 && arr[k - gw - 1] + D2 < arr[k]) arr[k] = arr[k - gw - 1] + D2;
+        if (i < gw - 1 && arr[k - gw + 1] + D2 < arr[k]) arr[k] = arr[k - gw + 1] + D2;
+      }
+    }
+    for (let j = gh - 1; j >= 0; j--) for (let i = gw - 1; i >= 0; i--) {
+      const k = j * gw + i;
+      if (i < gw - 1 && arr[k + 1] + D1 < arr[k]) arr[k] = arr[k + 1] + D1;
+      if (j < gh - 1) {
+        if (arr[k + gw] + D1 < arr[k]) arr[k] = arr[k + gw] + D1;
+        if (i < gw - 1 && arr[k + gw + 1] + D2 < arr[k]) arr[k] = arr[k + gw + 1] + D2;
+        if (i > 0 && arr[k + gw - 1] + D2 < arr[k]) arr[k] = arr[k + gw - 1] + D2;
+      }
+    }
+  };
+  chamfer(d); chamfer(dn);
+  for (let k = 0; k < d.length; k++) d[k] = d[k] > 0 ? d[k] : -dn[k];
+  sdfInfo = {cell, gw, gh, d};
+}
+
+// bilinear sample (the -cell/2 shifts the zero level from solid sample
+// centres onto the wall face)
+function sdfAt(x, y) {
+  const {cell, gw, gh, d} = sdfInfo;
+  const fx = clamp(x / cell - 0.5, 0, gw - 1.001), fy = clamp(y / cell - 0.5, 0, gh - 1.001);
+  const i = fx | 0, j = fy | 0, u = fx - i, v = fy - j;
+  const k = j * gw + i;
+  return (d[k] * (1 - u) + d[k + 1] * u) * (1 - v) +
+         (d[k + gw] * (1 - u) + d[k + gw + 1] * u) * v - cell / 2;
+}
+function sdfGrad(x, y) {
+  const h = 6;
+  const gx = sdfAt(x + h, y) - sdfAt(x - h, y);
+  const gy = sdfAt(x, y + h) - sdfAt(x, y - h);
+  const m = Math.hypot(gx, gy) || 1;
+  return {x: gx / m, y: gy / m};
+}
+
 // walls turn steel: a swing that meets stone rebounds hard — narrow
 // cuts are thrust country, and a wild swing indoors is a mistake.
-// Swept like every other contact (fast blades tunnel through a single
-// pose check), and penetration is RESOLVED, not tolerated: steel never
-// ends a frame inside stone, so a blade can neither hide in a wall nor
-// reach through one to the fencer beyond.
+// Swept like every other contact, and penetration is RESOLVED on the
+// distance field: steel never ends a frame inside stone, so a blade
+// can neither hide in a wall nor reach through one.
 function bladeVsWalls(f) {
-  if (!walls.length) return;
+  if (!walls.length || !sdfInfo) return;
   const limp = f.fallen > 0;      // a dropped blade still cannot rest in stone
   const L = f.weapon.len;
-  const reach = f.r + 6 + L + Math.max(f.ext, f.prevExt ?? 0) + 10;
-  const near = [];
-  for (const r of walls) {
-    const cx = clamp(f.x, r.x, r.x + r.w), cy = clamp(f.y, r.y, r.y + r.h);
-    if (Math.hypot(f.x - cx, f.y - cy) < reach) near.push(r);
-  }
-  if (!near.length) return;
-  const steps = Math.max(4, Math.ceil(L / 20));      // a sample every ~20px of steel
-  const penAt = (b) => {
+  const rad = f.weapon.rad + 1;   // the steel's capsule radius + skin
+  if (sdfAt(f.x, f.y) > f.r + 6 + L + 50) return;   // nowhere near stone
+  const steps = Math.max(4, Math.ceil(L / 18));
+  // the FIRST penetrating sample marching out from the hand — the entry
+  // point. Thin walls put an SDF ridge mid-wall where the gradient is
+  // ambiguous (or points out the FAR side, i.e. through the wall); the
+  // entry point is always on the wielder's own side, where the gradient
+  // honestly says "back the way you came".
+  const firstPen = (b) => {
     for (let s = 0; s <= steps; s++) {
-      const q = 0.12 + (0.88 * s) / steps;
+      const q = 0.1 + (0.9 * s) / steps;
       const px = b.hx + (b.tx - b.hx) * q, py = b.hy + (b.ty - b.hy) * q;
-      for (const r of near) if (pointInRect(px, py, r)) return {px, py, r};
+      const sd = sdfAt(px, py);
+      if (sd < rad) return {px, py, sd};
     }
     return null;
   };
   for (const off of segOffs(f)) {
     if (!limp) {
+      // swept: the first sub-frame pose already in contact
       let hit = null, tC = 1;
       for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
-        const p = penAt(bladeAt(f, t, off));
+        const p = firstPen(bladeAt(f, t, off));
         if (p) { hit = p; tC = t; break; }
       }
       if (!hit) continue;
-      const r = hit.r;
-      const pl = hit.px - r.x, pr = r.x + r.w - hit.px, pt = hit.py - r.y, pb = r.y + r.h - hit.py;
-      const m = Math.min(pl, pr, pt, pb);
-      const nx = m === pl ? -1 : m === pr ? 1 : 0;
-      const ny = nx ? 0 : (m === pt ? -1 : 1);
+      const n = sdfGrad(hit.px, hit.py);
       const speed = Math.abs(f.w) * (f.r + 6 + L);
-      // rewind to just before the stone
       const t0 = Math.max(0, tC - 1 / 6);
       f.th = wrapAngle((f.prevTh ?? f.th) + wrapAngle(f.th - (f.prevTh ?? f.th)) * t0);
       f.ext = (f.prevExt ?? f.ext) + (f.ext - (f.prevExt ?? f.ext)) * t0;
@@ -741,47 +827,37 @@ function bladeVsWalls(f) {
         if ((f.bladeCd || 0) <= 0) {
           f.bladeCd = 0.15;
           f.bladeStun = Math.max(f.bladeStun, 0.2);
-          drainBalance(f, Math.min(8, speed * 0.006), nx, ny);
+          drainBalance(f, Math.min(8, speed * 0.006), n.x, n.y);
           sfx.thunk();
           sparkAt(hit.px, hit.py, getCss('--steel'), 6);
         }
       }
-    } else if (!penAt(bladeOf(f, off))) {
-      continue;
     }
-    // hard resolve: rotate the blade out of the stone. A spear carried
-    // into a narrow cut is FORCED to lie along it — that's the design.
-    // The direction is chosen ONCE and held (per fencer, sticky across
-    // frames): re-deciding each step oscillates at symmetric poses and
-    // never escapes. Budget 64 × 0.025 = 1.6 rad — enough to go from
-    // perpendicular-into-the-face to lying along it.
-    let dir = 0;
-    for (let iter = 0; iter < 64; iter++) {
-      const p = penAt(bladeOf(f, off));
-      if (!p) { if (iter > 0) f.resolveDir = dir; break; }
-      if (!dir) {
-        const rr = p.r;
-        const l2 = p.px - rr.x, r2 = rr.x + rr.w - p.px, t2 = p.py - rr.y, b2 = rr.y + rr.h - p.py;
-        const m2 = Math.min(l2, r2, t2, b2);
-        const nx2 = m2 === l2 ? -1 : m2 === r2 ? 1 : 0;
-        const ny2 = nx2 ? 0 : (m2 === t2 ? -1 : 1);
-        const k = -(p.py - f.y) * nx2 + (p.px - f.x) * ny2;   // which way rotation frees the point
-        dir = Math.abs(k) > 2 ? (k > 0 ? 1 : -1) : (f.resolveDir || (f.wobPhase < Math.PI ? 1 : -1));
+    // penetration cleanup, Newton-style on the field: rotate by exactly
+    // the angle that frees the entry point along its gradient; when
+    // rotation can't reach it (point radially pinned, concave corner),
+    // the stone pushes the BODY instead
+    let shoved = 0;
+    for (let iter = 0; iter < 10; iter++) {
+      const p = firstPen(bladeOf(f, off));
+      if (!p) break;
+      const n = sdfGrad(p.px, p.py);
+      const depth = rad - p.sd;
+      const k = -(p.py - f.y) * n.x + (p.px - f.x) * n.y;   // d(point·n)/dθ
+      if (Math.abs(k) > 12) {
+        const dth = clamp((depth / k) * 1.15, -0.35, 0.35);
+        f.th = wrapAngle(f.th + dth);
+        if (f.w * Math.sign(dth) < 0) f.w *= 0.5;
+        f.ext = Math.min(f.ext, 0);
+      } else {
+        // radially pinned: the stone shoves the BODY back — but as a
+        // firm push over a few frames, never a teleport
+        const step = Math.min(depth, 30 - shoved);
+        if (step <= 0) break;
+        f.x += n.x * step; f.y += n.y * step;
+        shoved += step;
+        keepInArena(f);
       }
-      f.th = wrapAngle(f.th + dir * 0.025);
-      f.ext = Math.min(f.ext, 0);
-      if (f.w * dir < 0) f.w *= 0.5;   // stop driving back into the stone
-    }
-    // cornered so no legal angle exists (a spear in a concave corner):
-    // the steel levers the BODY back out instead
-    const still = penAt(bladeOf(f, off));
-    if (still) {
-      const rr = still.r;
-      const l3 = still.px - rr.x, r3 = rr.x + rr.w - still.px, t3 = still.py - rr.y, b3 = rr.y + rr.h - still.py;
-      const m3 = Math.min(l3, r3, t3, b3);
-      const nx3 = m3 === l3 ? -1 : m3 === r3 ? 1 : 0;
-      const ny3 = nx3 ? 0 : (m3 === t3 ? -1 : 1);
-      f.vx += nx3 * 26; f.vy += ny3 * 26;
     }
   }
 }
@@ -835,21 +911,6 @@ function bladePointVel(f, px, py) {
     x: f.vx - (py - f.y) * f.w + Math.cos(f.th) * f.extVel,
     y: f.vy + (px - f.x) * f.w + Math.sin(f.th) * f.extVel,
   };
-}
-
-// closest points between the outer halves of two blades
-function closestBlades(pb, fb) {
-  const pmx = (pb.hx + pb.tx) / 2, pmy = (pb.hy + pb.ty) / 2;
-  const fmx = (fb.hx + fb.tx) / 2, fmy = (fb.hy + fb.ty) / 2;
-  let best = {d2: 1e9, px: 0, py: 0, fx: 0, fy: 0};
-  for (let s = 0; s <= 8; s++) {
-    const q = s / 8;
-    const x = pmx + (pb.tx - pmx) * q, y = pmy + (pb.ty - pmy) * q;
-    const r = segCircle(fmx, fmy, fb.tx, fb.ty, x, y, 1e9);
-    const dx = x - r.px, dy = y - r.py, d2 = dx * dx + dy * dy;
-    if (d2 < best.d2) best = {d2, px: x, py: y, fx: r.px, fy: r.py};
-  }
-  return best;
 }
 
 // convert a linear push at a blade point into an angular nudge of the
@@ -935,19 +996,34 @@ function pairCombat(A, B, dt, allies) {
   // they never ghost through, at any speed. Multi-segment weapons (claw
   // pairs) check every segment pair; the first touching pair resolves.
   if (A.fallen <= 0 && B.fallen <= 0) {
-    // swept contact search: at each sub-frame pose check BOTH a true
-    // crossing AND a close approach (a fast sweep can pass the narrow
-    // approach window entirely between frames — the common squared-up
-    // geometry never yields a clean crossing at all)
-    let contact = null, tC = 1, offA = 0, offB = 0;
+    // capsule contact: blades are steel with thickness, so the test is
+    // ONE primitive — closest centerline distance against the summed
+    // radii, swept across sub-frame poses. A true centerline crossing
+    // (tunneled inside a substep) still rewinds to the side it came
+    // from; everything else needs no special cases, including the
+    // near-parallel geometry that zero-width segments made degenerate.
+    const rSum = A.weapon.rad + B.weapon.rad;
+    let contact = null, tC = 1, offA = 0, offB = 0, tipTip = false;
     outer:
     for (const oa of segOffs(A)) for (const ob of segOffs(B)) {
       for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
         const pa = bladeAt(A, t, oa), fa = bladeAt(B, t, ob);
         const x = segIntersect({x: pa.hx, y: pa.hy}, {x: pa.tx, y: pa.ty}, {x: fa.hx, y: fa.hy}, {x: fa.tx, y: fa.ty});
         if (x) { contact = x; tC = Math.max(0, t - 1 / 6); offA = oa; offB = ob; break outer; }   // rewind to just before
-        const nr = closestBlades(pa, fa);
-        if (nr.d2 < 100) { contact = {x: (nr.px + nr.fx) / 2, y: (nr.py + nr.fy) / 2}; tC = t; offA = oa; offB = ob; break outer; }
+        // point against point is UNSTABLE: two tips driving down the
+        // same line take their contact normal ALONG that line — the
+        // huge head-on closing speed becomes a lateral flick (via the
+        // lever-arm asymmetry), and points deflect instead of politely
+        // sliding past. The capsule's exact lateral normal would read
+        // this meeting as a near-zero-speed graze and lose the beat.
+        const tdx = fa.tx - pa.tx, tdy = fa.ty - pa.ty;
+        if (tdx * tdx + tdy * tdy < 400) {
+          contact = {x: (pa.tx + fa.tx) / 2, y: (pa.ty + fa.ty) / 2};
+          tC = t; offA = oa; offB = ob; tipTip = true;
+          break outer;
+        }
+        const cc = segSegClosest(pa.hx, pa.hy, pa.tx, pa.ty, fa.hx, fa.hy, fa.tx, fa.ty);
+        if (cc.d2 <= rSum * rSum) { contact = {x: (cc.px + cc.qx) / 2, y: (cc.py + cc.qy) / 2}; tC = t; offA = oa; offB = ob; break outer; }
       }
     }
     if (contact) {
@@ -956,9 +1032,22 @@ function pairCombat(A, B, dt, allies) {
       // post-step pose may already be interpenetrating, and a normal
       // computed across a crossing points anywhere.
       const paC = bladeAt(A, tC, offA), faC = bladeAt(B, tC, offB);
-      const nC = closestBlades(paC, faC);
-      const ndC = Math.sqrt(nC.d2) || 0.001;
-      const nCx = (nC.fx - nC.px) / ndC, nCy = (nC.fy - nC.py) / ndC;
+      let nC, nCx, nCy, ndC;
+      if (tipTip) {
+        nC = {px: paC.tx, py: paC.ty, qx: faC.tx, qy: faC.ty};
+        const tdx = nC.qx - nC.px, tdy = nC.qy - nC.py;
+        ndC = Math.hypot(tdx, tdy);
+        if (ndC > 0.5) { nCx = tdx / ndC; nCy = tdy / ndC; }
+        else {          // dead-centre meeting: deflect across A's blade
+          const bl = Math.hypot(paC.tx - paC.hx, paC.ty - paC.hy) || 1;
+          nCx = -(paC.ty - paC.hy) / bl; nCy = (paC.tx - paC.hx) / bl;
+          ndC = 0.5;
+        }
+      } else {
+        nC = segSegClosest(paC.hx, paC.hy, paC.tx, paC.ty, faC.hx, faC.hy, faC.tx, faC.ty);
+        ndC = Math.sqrt(nC.d2) || 0.001;
+        nCx = (nC.qx - nC.px) / ndC; nCy = (nC.qy - nC.py) / ndC;
+      }
       const closingOf = (f, cxx, cyy, dirX, dirY) => {
         const rx = cxx - f.x, ry = cyy - f.y;
         return f.w * ((-ry) * dirX + rx * dirY) > 0;
@@ -967,7 +1056,7 @@ function pairCombat(A, B, dt, allies) {
       // knocked away must be free to leave, but a blade that charged in
       // is put back on the side it came from
       const pClosing = closingOf(A, nC.px, nC.py, nCx, nCy);
-      const fClosing = closingOf(B, nC.fx, nC.fy, -nCx, -nCy);
+      const fClosing = closingOf(B, nC.qx, nC.qy, -nCx, -nCy);
       for (const [f, isClosing] of [[A, pClosing], [B, fClosing]]) {
         if (!isClosing) continue;
         f.th = wrapAngle((f.prevTh ?? f.th) + wrapAngle(f.th - (f.prevTh ?? f.th)) * tC);
@@ -981,11 +1070,25 @@ function pairCombat(A, B, dt, allies) {
       // heavy swing transfers most of its momentum, a static guard held
       // near the hilt (the forte) resists far better than one met at the
       // tip, and gentle pressure just eases blades around each other.
-      const cx = (nC.px + nC.fx) / 2, cy = (nC.py + nC.fy) / 2;
+      const cx = (nC.px + nC.qx) / 2, cy = (nC.py + nC.qy) / 2;
       const pv = bladePointVel(A, cx, cy), fv = bladePointVel(B, cx, cy);
       const rel = Math.hypot(pv.x - fv.x, pv.y - fv.y);
       // approach speed along the contact normal (n points A→B blade)
-      const vreln = (fv.x - pv.x) * nCx + (fv.y - pv.y) * nCy;
+      let vreln = (fv.x - pv.x) * nCx + (fv.y - pv.y) * nCy;
+      // bind ejection: driving ALONG a bound blade is unstable — two
+      // meeting thrusts beat each other aside. Geometrically the touch
+      // is lateral, but the ejection acts mostly ALONG the blades (the
+      // soft, body-compliance direction, so the impulse is large) with
+      // the small lateral offset deciding which side each point slips.
+      const axx = Math.cos(A.th + offA), axy = Math.sin(A.th + offA);
+      const relAx = (fv.x - pv.x) * axx + (fv.y - pv.y) * axy;
+      if (!tipTip && Math.abs(relAx) > 250 && Math.abs(relAx) > 3 * Math.abs(vreln)) {
+        const s = Math.sign(relAx) || 1;
+        const bx2 = 0.35 * nCx - s * 0.94 * axx, by2 = 0.35 * nCy - s * 0.94 * axy;
+        const bm = Math.hypot(bx2, by2) || 1;
+        nCx = bx2 / bm; nCy = by2 / bm;
+        vreln = (fv.x - pv.x) * nCx + (fv.y - pv.y) * nCy;
+      }
       if (vreln < 0) {
         // per-blade inertia: a heavy blade (Strong) soaks the impulse —
         // the other blade takes the bigger bounce
@@ -1025,11 +1128,11 @@ function pairCombat(A, B, dt, allies) {
           hitstop = Math.max(hitstop, 0.045);
           shakeT = Math.max(shakeT, 0.14);
         }
-      } else if (ndC < 10) {
-        // touching with no approach: just ease the blades apart
-        const overlap = 10 - ndC;
+      } else if (ndC < rSum + 1) {
+        // touching with no approach: just ease the surfaces apart
+        const overlap = rSum + 1 - ndC;
         nudgeBlade(A, nC.px, nC.py, -nCx * overlap * 0.5, -nCy * overlap * 0.5);
-        nudgeBlade(B, nC.fx, nC.fy, nCx * overlap * 0.5, nCy * overlap * 0.5);
+        nudgeBlade(B, nC.qx, nC.qy, nCx * overlap * 0.5, nCy * overlap * 0.5);
       }
     }
   }
@@ -1045,14 +1148,14 @@ function bladeVsBody(att, def, dt) {
   // the defender's shield: narrow, but it physically turns blades away
   if (def.hasShield && def.fallen <= 0) {
     const ss = shieldSeg(def);
+    const sRad = att.weapon.rad + 4;   // steel capsule vs the shield's rim
     let sT = null, sOff = 0;
     souter:
     for (const off of segOffs(att)) {
       for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
         const ba = bladeAt(att, t, off);
-        if (segIntersect({x: ba.hx, y: ba.hy}, {x: ba.tx, y: ba.ty}, ss.p1, ss.p2)) { sT = t; sOff = off; break souter; }
-        const nr = segCircle(ss.p1.x, ss.p1.y, ss.p2.x, ss.p2.y, ba.tx, ba.ty, 7);
-        if (nr.hit) { sT = t; sOff = off; break souter; }
+        const cc = segSegClosest(ba.hx, ba.hy, ba.tx, ba.ty, ss.p1.x, ss.p1.y, ss.p2.x, ss.p2.y);
+        if (cc.d2 <= sRad * sRad) { sT = t; sOff = off; break souter; }
       }
     }
     if (sT !== null) {
@@ -1080,17 +1183,24 @@ function bladeVsBody(att, def, dt) {
       return;   // the shield stands between blade and body
     }
   }
-  // swept check across the frame, every weapon segment
+  // swept check across the frame, every weapon segment (capsule: the
+  // steel's own radius counts toward the touch)
   let hit = null, hOff = 0;
   houter:
   for (const off of segOffs(att)) {
     for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
       const ba = bladeAt(att, t, off);
-      const h = segCircle(ba.hx, ba.hy, ba.tx, ba.ty, def.x, def.y, def.r + 4);
+      const h = segCircle(ba.hx, ba.hy, ba.tx, ba.ty, def.x, def.y, def.r + 2 + att.weapon.rad);
       if (h.hit) { hit = h; hOff = off; break houter; }
     }
   }
   if (!hit) return;
+  // stone between the hand and the touch voids it — no wounding around
+  // (or through) a wall that the steel itself cannot pass
+  if (walls.length) {
+    const hb = bladeOf(att, hOff);
+    if (!losClear(hb.hx, hb.hy, hit.px, hit.py)) return;
+  }
 
   // damage is decided by the RELATIVE velocity at the contact point —
   // walking onto a still point is a press, dashing onto it is a wound
@@ -1105,11 +1215,12 @@ function bladeVsBody(att, def, dt) {
     // PRESS: too slow to cut — the body leans on the point and is pushed
     // back while the blade deflects around it; nothing ghosts through
     const blade = bladeOf(att, hOff);
-    const h = segCircle(blade.hx, blade.hy, blade.tx, blade.ty, def.x, def.y, def.r + 4);
+    const pressR = def.r + 2 + att.weapon.rad;
+    const h = segCircle(blade.hx, blade.hy, blade.tx, blade.ty, def.x, def.y, pressR);
     if (h.hit && def.fallen <= 0) {
       const nx = def.x - h.px, ny = def.y - h.py;
       const nd = Math.hypot(nx, ny) || 0.001;
-      const overlap = (def.r + 4) - nd;
+      const overlap = pressR - nd;
       if (overlap > 0) {
         def.vx += (nx / nd) * 110 * overlap * dt;
         def.vy += (ny / nd) * 110 * overlap * dt;
@@ -1442,6 +1553,7 @@ function genFloor() {
   gridInfo = {gw, gh, open: new Uint8Array(gw * gh)};
   for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) gridInfo.open[j * gw + i] = solid[j][i] ? 0 : 1;
   flowCache = new Map();
+  buildSdf();
   return rooms;
 }
 
