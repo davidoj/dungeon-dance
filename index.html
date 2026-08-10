@@ -176,8 +176,8 @@ const TAKEN_BALANCE_RATIO = 1.15;       // balance lost per point of damage take
 const FALL_TIME = 1.4;                  // a stumble, not a collapse
 const HIT_IFRAMES = 0.45;
 
-const DMG_SCALE = 26;                   // damage per (tip speed / 1000)
-const TIP_SPEED_MIN = 320;              // slower contact than this doesn't cut
+const DMG_SCALE = 34;                   // damage per (tip speed / 1000) — raised with the short-blade experiment
+const TIP_SPEED_MIN = 260;              // slower contact than this doesn't cut (scaled to shorter levers)
 
 const ROUNDS_TO_WIN = 3;
 
@@ -190,11 +190,15 @@ const ROUNDS_TO_WIN = 3;
 // walk: carry weight. offs: multi-segment natural weapons (claw pairs).
 // rad: the capsule radius — blades are steel with THICKNESS, and all
 // contact is capsule-vs-capsule (fat heavy blades bind a touch earlier)
+// EXPERIMENT (2026-08-10): forged blades cut ~33% shorter so rooms feel
+// roomy and corridors stop owning every fight — DMG_SCALE and the cut
+// thresholds are compensated below so the wound economy stays put.
+// Previous lengths: sword 92, quick 84, heavy 96, spear 150.
 const WEAPONS = {
-  sword: {key: 'sword', label: 'SWORD',       len: 92,  rad: 2.5, I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1},
-  quick: {key: 'quick', label: 'QUICKBLADE',  len: 84,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
-  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 96,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
-  spear: {key: 'spear', label: 'SPEAR',       len: 150, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
+  sword: {key: 'sword', label: 'SWORD',       len: 62,  rad: 2.5, I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1},
+  quick: {key: 'quick', label: 'QUICKBLADE',  len: 56,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
+  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
+  spear: {key: 'spear', label: 'SPEAR',       len: 100, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
   claws: {key: 'claws', label: 'CLAWS',       len: 46,  rad: 2,   I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
   nose:  {key: 'nose',  label: 'SNOUT',       len: 26,  rad: 2,   I: 0.4,  W: 1.2, speed: 1.15, swingBal: 0.6, swingStam: 0.7,  give: 0.6, dmg: 0.5,  walk: 1, natural: true},
 };
@@ -637,7 +641,7 @@ function stepFencer(f, dt, intent, other) {
   f.burst = Math.max(0, f.burst - dt);
 
   // a cut "re-arms" once the blade slows down
-  if (tipSpeed(f) < 260) f.hitThisSwing = false;
+  if (tipSpeed(f) < 210) f.hitThisSwing = false;
 
   // spring gains: bursting is stiff and hungry; otherwise slightly
   // underdamped. A beaten blade's spring goes limp: the knock-aside
