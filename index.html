@@ -171,7 +171,8 @@ const BALANCE_REGEN_COMBAT = 40;        // ...and double recharge (× stamina fr
 const BALANCE_REGEN_REST = 100;
 const COMBAT_WINDOW = 3.0;
 
-const HIT_BALANCE_COST = 14;            // landing a hit still jolts you
+const HIT_BALANCE_COST = 5;             // landing a hit nudges your weight — never fells you
+const HIT_STAMINA_COST = 12;            // pressing the advantage burns wind instead
 const TAKEN_BALANCE_RATIO = 1.15;       // balance lost per point of damage taken — being hit HURTS
 const FALL_TIME = 1.4;                  // a stumble, not a collapse
 const HIT_IFRAMES = 0.45;
@@ -1130,8 +1131,8 @@ function pairCombat(A, B, dt, allies) {
         const stunF = clamp(Math.abs(dwF) * 0.045, 0, 0.6);
         if (stunP > 0.12) A.bladeStun = Math.max(A.bladeStun, stunP);
         if (stunF > 0.12) B.bladeStun = Math.max(B.bladeStun, stunF);
-        drainBalance(A, Math.min(16, Math.abs(dwP) * 1.1) * B.weapon.give, -nCx, -nCy);
-        drainBalance(B, Math.min(16, Math.abs(dwF) * 1.1) * A.weapon.give, nCx, nCy);
+        drainBalance(A, Math.min(10, Math.abs(dwP) * 0.9) * B.weapon.give, -nCx, -nCy);
+        drainBalance(B, Math.min(10, Math.abs(dwF) * 0.9) * A.weapon.give, nCx, nCy);
         if (rel > 300) {
           A.extVel = Math.min(A.extVel, -20);
           B.extVel = Math.min(B.extVel, -20);
@@ -1259,9 +1260,11 @@ function bladeVsBody(att, def, dt) {
   drainBalance(def, dmg * TAKEN_BALANCE_RATIO * att.weapon.give, hkx / hkm, hky / hkm);
   def.iframes = HIT_IFRAMES;
   def.sinceHit = 0; att.sinceHit = 0;
-  // striking is committing: a landed touch drops you into a low-balance
-  // window — the lunge carries your weight forward
-  drainBalance(att, 15, Math.cos(att.facing), Math.sin(att.facing));
+  // striking is committing — but pressing the advantage should tire
+  // you, not fell you: a landed touch costs mostly WIND, with only a
+  // light forward nudge of your weight
+  drainBalance(att, HIT_BALANCE_COST, Math.cos(att.facing), Math.sin(att.facing));
+  att.stamina = Math.max(0, att.stamina - HIT_STAMINA_COST);
 
   if (wasStumbled) {
     // hit while stumbled: you're sent ROLLING a long way — and come up
