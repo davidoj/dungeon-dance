@@ -75,6 +75,11 @@ perception lag were reverted.
   axial sliding blends the normal toward the blade axis, the soft
   body-compliance direction — two driving thrusts beat each other aside).
   Don't "simplify" either away; without them thrust-fencing goes silent.
+  One escape hatch: for ~0.7s after a fencer stands up (`upT`), a blade pair
+  that BEGINS the frame already crossed ghosts apart freely — a stumble can
+  leave blades tangled (limp blades take no contact), and a tangle has no
+  contact moment to rewind to, so impulses would only jitter-bind. The gate
+  matters: deep binds legitimately end frames crossed and must keep ejecting.
 - **Contact normals at the contact moment.** Normals are evaluated at the
   rewound pose (`bladeAt(f, tC)`), not the post-step pose; only blades
   rotating *into* contact get rewound.

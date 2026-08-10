@@ -517,6 +517,7 @@ function stepFencer(f, dt, intent, other) {
   // remember pose for swept collision (fast blades tunnel through single-frame checks)
   f.prevTh = f.th; f.prevX = f.x; f.prevY = f.y; f.prevExt = f.ext;
   f.sinceHit += dt; f.iframes -= dt;
+  f.upT = (f.upT ?? 9) + dt;   // time since last standing up
 
   // --- resources: the triad ---
   const staminaRegen = STAMINA_REGEN * f.body.stamRegen * (f.health / f.maxHealth);
@@ -536,7 +537,7 @@ function stepFencer(f, dt, intent, other) {
   }
   if (f.fallen > 0) {
     f.fallen -= dt;
-    if (f.fallen <= 0) { f.fallen = 0; f.balance = MAX_BALANCE * 0.5; f.stamina = Math.max(f.stamina, 30); }
+    if (f.fallen <= 0) { f.fallen = 0; f.balance = MAX_BALANCE * 0.5; f.stamina = Math.max(f.stamina, 30); f.upT = 0; }
     // limp physics only
     f.vx *= Math.exp(-6 * dt); f.vy *= Math.exp(-6 * dt);
     f.x += f.vx * dt; f.y += f.vy * dt;
@@ -1006,6 +1007,18 @@ function pairCombat(A, B, dt, allies) {
     let contact = null, tC = 1, offA = 0, offB = 0, tipTip = false;
     outer:
     for (const oa of segOffs(A)) for (const ob of segOffs(B)) {
+      // stand-up tangle: while a fencer is down their limp blade takes
+      // no contact, so the other blade can end up CROSSED with it. On
+      // recovery there is no contact moment to rewind to and no honest
+      // normal — impulses would just jitter-bind. For a short window
+      // after standing, a pair that begins the frame crossed ghosts
+      // apart freely; contact resumes the moment they separate. (Gated
+      // to the stand-up window: deep binds legitimately end frames
+      // crossed, and must keep their ejection.)
+      if ((A.upT ?? 9) < 0.7 || (B.upT ?? 9) < 0.7) {
+        const a0 = bladeAt(A, 0, oa), b0 = bladeAt(B, 0, ob);
+        if (segIntersect({x: a0.hx, y: a0.hy}, {x: a0.tx, y: a0.ty}, {x: b0.hx, y: b0.hy}, {x: b0.tx, y: b0.ty})) continue;
+      }
       for (const t of [1/6, 2/6, 3/6, 4/6, 5/6, 1]) {
         const pa = bladeAt(A, t, oa), fa = bladeAt(B, t, ob);
         const x = segIntersect({x: pa.hx, y: pa.hy}, {x: pa.tx, y: pa.ty}, {x: fa.hx, y: fa.hy}, {x: fa.tx, y: fa.ty});
