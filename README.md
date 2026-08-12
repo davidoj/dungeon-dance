@@ -50,9 +50,8 @@ Rules of the dungeon:
   arms barely feel it. A quickblade is the opposite bargain — light and fast,
   but every clash wrenches *you*.
 - **Level-ups grow capability, never numbers.** Kills bank experience; each
-  level is a choice between **ARMS** (swing faster, swings cost less),
-  **LEGS** (walk faster, dash further, dashes cost less) and **BRAIN** (the
-  world runs 5% slower to your eyes — max 2 stacks). There is no +12%
+  level is a choice between **ARMS** (swing faster, swings cost less) and
+  **LEGS** (walk faster, dash further, dashes cost less). There is no +12%
   damage in this game.
 - Clearing a room refills your stamina; clearing a floor refills your
   health — the full clear beats rushing the stairs.
@@ -75,7 +74,7 @@ three touches.
 | click | a muscle impulse toward the mouse — aligned it's a stab, across the foe it's a swipe; reversing a live swing costs balance |
 | `SPACE` | dash — dashing *under* your lean is a recovery step that restores balance |
 | `E` | take a weapon from the floor |
-| `T` | slow motion |
+| `T` | slow motion (duel and practice only — the whole game already runs at 90% speed) |
 | `M` | mute |
 
 Watch the red **X**: it's your centre of gravity, kicked around by every

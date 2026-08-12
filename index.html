@@ -87,7 +87,7 @@
     <span class="k">click</span><span class="v">a muscle impulse toward the mouse, repeatable at will —<br>aligned it's a stab, across the foe it's a swipe; reversing a live swing costs balance</span>
     <span class="k">SPACE</span><span class="v">dash (a lunge if you strike mid-dash)</span>
     <span class="k">E</span><span class="v">take a weapon from the floor (yours drops where you stand)</span>
-    <span class="k">T</span><span class="v">slow motion</span>
+    <span class="k">T</span><span class="v">slow motion (duel &amp; practice only)</span>
     <span class="k">M</span><span class="v">sound on/off</span>
   </div>
   <div id="btnRow">
@@ -126,8 +126,8 @@
   </div>
   <div class="hint">
     <em>DESCEND</em>: a 3-floor dive — critters, then a garrison, then the proving hall.
-    You start a plain fencer; weapons are loot, and level-ups grow your ARMS, LEGS
-    or BRAIN. Death ends the run.
+    You start a plain fencer; weapons are loot, and level-ups grow your ARMS or LEGS.
+    Death ends the run.
     Blades <em>bounce</em> off each other, walls turn steel — narrow corridors are thrust
     country. Your <em>balance</em> is spent by bursts, clashes and taken hits — at zero
     you <em>stumble</em>. Stamina refills balance; health refills stamina.
@@ -210,10 +210,14 @@ const ROUNDS_TO_WIN = 3;
 // thresholds are compensated below so the wound economy stays put.
 // Previous lengths: sword 92, quick 84, heavy 96, spear 150.
 const WEAPONS = {
-  sword: {key: 'sword', label: 'SWORD',       len: 62,  rad: 2.5, I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1},
-  quick: {key: 'quick', label: 'QUICKBLADE',  len: 56,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02},
-  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9},
-  spear: {key: 'spear', label: 'SPEAR',       len: 100, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true},
+  sword: {key: 'sword', label: 'SWORD',       len: 62,  rad: 2.5, I: 1,    W: 1,   speed: 1,    swingBal: 1,   swingStam: 1,    give: 1,   dmg: 1,    walk: 1,
+          blurb: 'the honest baseline'},
+  quick: {key: 'quick', label: 'QUICKBLADE',  len: 56,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02,
+          blurb: 'light and fast — but clashes wrench YOU'},
+  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.72, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9,
+          blurb: 'slow, wrecking, shrugs off clashes — slows your walk'},
+  spear: {key: 'spear', label: 'SPEAR',       len: 100, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true,
+          blurb: 'long reach, deadly point — the shaft is harmless'},
   claws: {key: 'claws', label: 'CLAWS',       len: 38,  rad: 2,   I: 0.5,  W: 0.9, speed: 1.25, swingBal: 0.7, swingStam: 0.8,  give: 0.8, dmg: 0.7,  walk: 1, offs: [-0.38, 0.38], natural: true},
   nose:  {key: 'nose',  label: 'SNOUT',       len: 26,  rad: 2,   I: 0.4,  W: 1.2, speed: 1.15, swingBal: 0.6, swingStam: 0.7,  give: 0.6, dmg: 0.5,  walk: 1, natural: true},
 };
@@ -221,7 +225,7 @@ const WEAPONS = {
 // level-ups buy CAPABILITY, never damage numbers — each stack multiplies
 const ARMS_SPEED = 1.12, ARMS_COST = 0.82;   // swing faster, swings cost less
 const LEGS_MOVE = 1.08, LEGS_DASH = 1.08, LEGS_COST = 0.82;
-const BRAIN_SLOW = 0.05, BRAIN_MAX = 2;      // the world runs 5% slower per stack, to your eyes
+const GLOBAL_SLOW = 0.9;                     // the whole game runs 10% slower — readable steel
 function armsSpd(f)  { return Math.pow(ARMS_SPEED, f.ups?.arms || 0); }
 function armsCost(f) { return Math.pow(ARMS_COST,  f.ups?.arms || 0); }
 function legsMove(f) { return Math.pow(LEGS_MOVE,  f.ups?.legs || 0); }
@@ -493,7 +497,7 @@ function applyDuelSelections() {
 function newDuelPickup() {
   const pool = [];
   if (!(player && player.hasShield)) pool.push('shield');
-  for (const wk of ['quick', 'heavy', 'spear']) {
+  for (const wk of ['heavy', 'spear']) {
     if (!player || player.weapon.key !== wk) pool.push(wk);
   }
   const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -511,7 +515,7 @@ let dashQueued = false, eQueued = false;
 addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === 'e' && !e.repeat) eQueued = true;
-  if (e.key.toLowerCase() === 't' && !e.repeat) timeScaleIdx = (timeScaleIdx + 1) % TIME_SCALES.length;
+  if (e.key.toLowerCase() === 't' && !e.repeat && mode !== 'dungeon') timeScaleIdx = (timeScaleIdx + 1) % TIME_SCALES.length;
   if (e.key.toLowerCase() === 'm' && !e.repeat) muted = !muted;
   if (e.key === 'Escape' && running) {
     running = false;
@@ -1416,11 +1420,16 @@ function foeFelled(def) {
     bannerT = 999;
     return;
   }
-  // loot: armed foes drop their kit where they fall
+  // loot: armed foes drop their kit where they fall — and ANYONE who
+  // held a shield leaves it behind, including a guard who scooped it
+  // up mid-fight
   if (def.drops) {
     pickups.push(def.drops === 'shield'
       ? {x: def.x, y: def.y, kind: 'shield', taken: false}
       : {x: def.x, y: def.y, kind: 'weapon', weapon: def.drops, taken: false});
+  }
+  if (def.hasShield && def.drops !== 'shield') {
+    pickups.push({x: def.x + 16, y: def.y + 12, kind: 'shield', taken: false});
   }
   // experience: capability, not numbers
   player.xp += def.xp || 0;
@@ -1741,8 +1750,9 @@ function roomSpot(r) {
 
 function castFloor(depth, mids, bossRoom) {
   // loose loot: forged weapons lying in side rooms, worth a detour
+  // (no quickblades — ARMS and LEGS upgrades already cover that niche)
   const scatterLoot = (n) => {
-    const pool = ['quick', 'heavy', 'spear'];
+    const pool = ['heavy', 'spear'];
     for (let i = 0; i < n && mids.length; i++) {
       const r = mids[Math.random() * mids.length | 0];
       const [x, y] = roomSpot(r);
@@ -1788,7 +1798,7 @@ function castFloor(depth, mids, bossRoom) {
       const ups = key === 'nimble' ? {legs: 2} : key === 'bulwark' ? {arms: 1, legs: 1} : {arms: 2};
       const [x, y] = roomSpot(r);
       spawnFoe(key, x, y, {group: 'r' + i, ...ups,
-        drops: key === 'bulwark' ? 'shield' : ARCHETYPES[key].weapon});
+        drops: (key === 'bulwark' || key === 'nimble') ? null : ARCHETYPES[key].weapon});
     });
     const champKey = Math.random() < 0.5 ? 'strong' : 'spear';
     const [bx, by] = roomSpot(bossRoom);
@@ -1964,7 +1974,6 @@ function tryWeaponSwap() {
 }
 
 function applyLevelPick(kind) {
-  if (kind === 'brain' && player.ups.brain >= BRAIN_MAX) return;
   player.ups[kind]++;
   pendingLevels--;
   spawnText(player.x, player.y - 50, kind === 'arms' ? 'ARMS +1' : 'LEGS +1', getCss('--balance'), 1.4);
@@ -2080,10 +2089,15 @@ function drawPickups() {
       ctx.restore();
       ctx.globalAlpha = 1;
       if (player && Math.hypot(player.x - p.x, player.y - p.y) < 130) {
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         ctx.fillStyle = getCss('--text');
         ctx.font = '12px ui-monospace, Menlo, monospace';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        ctx.fillText(`E — ${wpn.label}`, p.x, p.y - 16);
+        ctx.fillText(`E — ${wpn.label}`, p.x, p.y - 30);
+        if (wpn.blurb) {
+          ctx.fillStyle = getCss('--dim');
+          ctx.font = '11px ui-monospace, Menlo, monospace';
+          ctx.fillText(wpn.blurb, p.x, p.y - 16);
+        }
       }
     }
   }
@@ -2110,7 +2124,6 @@ function drawLevelup() {
   ctx.fillStyle = getCss('--dim');
   ctx.fillText('training shapes the body — pick what grows', W / 2, H / 2 - 100);
   const kinds = ['arms', 'legs'];
-  if (player.ups.brain < BRAIN_MAX) kinds.push('brain');
   const bw = Math.min(230, W * 0.28), bh = 130, gap = 22;
   const total = kinds.length * bw + (kinds.length - 1) * gap;
   const y0 = H / 2 - 50;
@@ -2118,7 +2131,6 @@ function drawLevelup() {
   const descs = {
     arms: ['ARMS', 'swing 12% faster', 'swings cost 18% less', `now ${player.ups.arms}`],
     legs: ['LEGS', 'walk 8% faster · dash 8% further', 'dashes cost 18% less', `now ${player.ups.legs}`],
-    brain: ['BRAIN', 'the world runs 5% slower', `to your eyes (max ${BRAIN_MAX})`, `now ${player.ups.brain}`],
   };
   for (const b of levelBtns) {
     const hov = mouse.x >= b.x && mouse.x <= b.x + b.w && mouse.y >= b.y && mouse.y <= b.y + b.h;
@@ -2446,7 +2458,7 @@ function drawHUD() {
     ctx.fillText(`FLOOR ${dungeon.depth} — ${FLOOR_NAMES[dungeon.depth]}`, W / 2, 18);
     ctx.fillStyle = getCss('--dim');
     ctx.font = '12px ui-monospace, Menlo, monospace';
-    ctx.fillText(`LV ${player.level} · ARMS ${player.ups.arms} · LEGS ${player.ups.legs} · BRAIN ${player.ups.brain} · ` +
+    ctx.fillText(`LV ${player.level} · ARMS ${player.ups.arms} · LEGS ${player.ups.legs} · ` +
       `${player.weapon.label}${player.hasShield ? ' + SHIELD' : ''} · ESC — surface`, W / 2, 40);
   } else {
     ctx.font = '22px ui-monospace, Menlo, monospace';
@@ -2513,11 +2525,7 @@ function loop(tMs) {
   const t = tMs / 1000;
   let dt = Math.min(0.033, t - lastT || 0.016);
   lastT = t;
-  dt *= TIME_SCALES[timeScaleIdx];
-  // BRAIN: a trained mind sees the world run a touch slower
-  if (mode === 'dungeon' && player && player.ups.brain) {
-    dt *= 1 - BRAIN_SLOW * Math.min(BRAIN_MAX, player.ups.brain);
-  }
+  dt *= TIME_SCALES[timeScaleIdx] * GLOBAL_SLOW;
 
   if (hitstop > 0) { hitstop -= dt; dt *= 0.12; }   // impact freeze
 
@@ -2659,6 +2667,7 @@ function startGame(m) {
   ac();
   resize();          // insurance against a stale viewport at first load
   if (m === 'dungeon') {
+    timeScaleIdx = 2;   // no slow motion in the dungeon — T is for the yard
     buildRun();      // the dive: you descend a plain CLASSIC and loot the rest
   } else {
     newMatch();
