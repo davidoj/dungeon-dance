@@ -224,8 +224,8 @@ const WEAPONS = {
 };
 
 // level-ups buy CAPABILITY, never damage numbers — each stack multiplies
-const ARMS_SPEED = 1.18, ARMS_COST = 0.73;   // swing faster, swings cost less
-const LEGS_MOVE = 1.12, LEGS_DASH = 1.12, LEGS_COST = 0.73;
+const ARMS_SPEED = 1.18, ARMS_COST = 0.85;   // the discount stays smaller than the speed boost
+const LEGS_MOVE = 1.12, LEGS_DASH = 1.12, LEGS_COST = 0.9;
 const GLOBAL_SLOW = 0.9;                     // the whole game runs 10% slower — readable steel
 function armsSpd(f)  { return Math.pow(ARMS_SPEED, f.ups?.arms || 0); }
 function armsCost(f) { return Math.pow(ARMS_COST,  f.ups?.arms || 0); }
@@ -2148,8 +2148,8 @@ function drawLevelup() {
   const y0 = H / 2 - 50;
   levelBtns = kinds.map((kind, i) => ({x: W / 2 - total / 2 + i * (bw + gap), y: y0, w: bw, h: bh, kind}));
   const descs = {
-    arms: ['ARMS', 'swing 18% faster', 'swings cost 27% less', `now ${player.ups.arms}`],
-    legs: ['LEGS', 'walk 12% faster · dash 12% further', 'dashes cost 27% less', `now ${player.ups.legs}`],
+    arms: ['ARMS', 'swing 18% faster', 'swings cost 15% less', `now ${player.ups.arms}`],
+    legs: ['LEGS', 'walk 12% faster · dash 12% further', 'dashes cost 10% less', `now ${player.ups.legs}`],
   };
   for (const b of levelBtns) {
     const hov = mouse.x >= b.x && mouse.x <= b.x + b.w && mouse.y >= b.y && mouse.y <= b.y + b.h;
