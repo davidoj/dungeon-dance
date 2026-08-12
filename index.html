@@ -60,7 +60,7 @@
     color: var(--dim); border-radius: 4px; cursor: pointer;
   }
   #backBtn:hover { border-color: var(--steel); color: var(--steel); }
-  #startBtn, #duelBtn, #practiceBtn, #engardeBtn {
+  #startBtn, #duelBtn, #practiceBtn, #engardeBtn, #resumeBtn {
     font-family: inherit; font-size: 1.15rem; letter-spacing: 0.2em; text-indent: 0.2em;
     background: none; color: var(--balance);
     border: 1px solid var(--balance); border-radius: 4px;
@@ -68,6 +68,8 @@
     transition: background 0.15s, color 0.15s;
   }
   #startBtn:hover, #startBtn:focus-visible { background: var(--balance); color: #10251F; outline: none; }
+  #resumeBtn { color: var(--steel); border-color: var(--steel); }
+  #resumeBtn:hover, #resumeBtn:focus-visible { background: var(--steel); color: #16181D; outline: none; }
   #duelBtn, #engardeBtn { color: var(--you); border-color: var(--you); }
   #duelBtn:hover, #duelBtn:focus-visible, #engardeBtn:hover, #engardeBtn:focus-visible { background: var(--you); color: #101825; outline: none; }
   #practiceBtn { color: var(--stamina); border-color: var(--stamina); }
@@ -91,6 +93,7 @@
     <span class="k">M</span><span class="v">sound on/off</span>
   </div>
   <div id="btnRow">
+    <button id="resumeBtn" style="display: none">RESUME</button>
     <button id="startBtn">DESCEND</button>
     <button id="duelBtn">DUEL</button>
     <button id="practiceBtn">PRACTICE</button>
@@ -129,8 +132,8 @@
     You start a plain fencer; weapons are loot, and level-ups grow your ARMS or LEGS.
     Death ends the run.
     Blades <em>bounce</em> off each other, walls turn steel — narrow corridors are thrust
-    country. Your <em>balance</em> is spent by bursts, clashes and taken hits — at zero
-    you <em>stumble</em>. Stamina refills balance; health refills stamina.
+    country. Your <em>balance</em> is spent by swings, clashes and taken hits — at zero
+    you <em>stumble</em>, and the wounded recover balance slowly.
   </div>
 </div>
 
@@ -153,8 +156,8 @@ const HAND_R = BODY_R + 6;
 
 const MOVE_ACCEL = 2600, MOVE_MAX = 240, FRICTION = 8;
 const BACKPEDAL = 0.65;                 // speed factor moving away from facing
-const DASH_V = 520, DASH_T = 0.16, DASH_COST = 18;
-const DASH_BALANCE = 4;                 // a dash throws your weight (see recovery step below)
+const DASH_V = 520, DASH_T = 0.16;
+const DASH_BALANCE = 8;                 // a dash throws your weight — balance is its whole price now
 const COG_RING = BODY_R + 26;           // support-base circle: the balance gauge's boundary
 
 // shield powerup: a NARROW arc riding CCW of the body's front — it
@@ -166,7 +169,7 @@ const SHIELD_R = BODY_R + 13;
 const SHIELD_SWORD_BIAS = 0.18;
 
 const BURST_T = 0.32;                   // seconds of muscle tension after a click
-const BURST_STAMINA = 10, BURST_BALANCE = 6;
+const BURST_BALANCE = 9;                // ×1.5 — swings are the main balance spend now
 const BURST_IMPULSE = 14;               // rad/s a click can add toward the aim
 
 // biomechanics: the arm's base point tracks the aim at its own pace;
@@ -178,15 +181,13 @@ const K_ROM = 60;
 const W_MAX = 9, W_MAX_BURST = 26;      // muscle-drive speed caps (rad/s)
 const TRAIL_LIFE = 0.22;                // seconds a tip-trace point lasts
 
-const MAX_HEALTH = 100, MAX_STAMINA = 100, MAX_BALANCE = 100;
-const STAMINA_REGEN = 14;               // × health fraction  (triad coupling)
+const MAX_HEALTH = 100, MAX_BALANCE = 100;
 const BALANCE_COST_MULT = 2;            // EXPERIMENT: spikier balance — double costs...
-const BALANCE_REGEN_COMBAT = 40;        // ...and double recharge (× stamina fraction)
-const BALANCE_REGEN_REST = 100;
+const BALANCE_REGEN_COMBAT = 40;        // ...and double recharge (× health fraction —
+const BALANCE_REGEN_REST = 100;         //     wounds slow your recovery; stamina is gone)
 const COMBAT_WINDOW = 3.0;
 
 const HIT_BALANCE_COST = 5;             // landing a hit nudges your weight — never fells you
-const HIT_STAMINA_COST = 12;            // pressing the advantage burns wind instead
 const TAKEN_BALANCE_RATIO = 1.15;       // balance lost per point of damage taken — being hit HURTS
 const FALL_TIME = 1.4;                  // a stumble, not a collapse
 const HIT_IFRAMES = 0.45;
@@ -214,7 +215,7 @@ const WEAPONS = {
           blurb: 'the honest baseline'},
   quick: {key: 'quick', label: 'QUICKBLADE',  len: 56,  rad: 2,   I: 0.7,  W: 0.8, speed: 1.18, swingBal: 0.8, swingStam: 0.85, give: 0.9, dmg: 0.9,  walk: 1.02,
           blurb: 'light and fast — but clashes wrench YOU'},
-  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.6,  swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9,
+  heavy: {key: 'heavy', label: 'HEAVY BLADE', len: 64,  rad: 4,   I: 1.9,  W: 1.6, speed: 0.55, swingBal: 1.7, swingStam: 1.35, give: 1.6, dmg: 1.15, walk: 0.9,
           blurb: 'slow, wrecking, shrugs off clashes — slows your walk'},
   spear: {key: 'spear', label: 'SPEAR',       len: 100, rad: 2.5, I: 1.15, W: 0.7, speed: 0.95, swingBal: 1.1, swingStam: 1.1,  give: 1,   dmg: 1,    walk: 0.95, tipOnly: true,
           blurb: 'long reach, deadly point — the shaft is harmless'},
@@ -249,7 +250,7 @@ const ARCHETYPES = {
   bulwark: {key: 'bulwark', label: 'BULWARK', weapon: 'sword', shield: true,
             body: {r: 26, hp: 100, move: 0.95, dashV: 1,   dashStam: 1,    dashBal: 1,    stamRegen: 1.25, shieldStam: 0.35},
             ai: {aggression: 0.35, dashiness: 0.6, retreat: 0.7, seekPickup: 0.95, range: 1.05, blockBias: 1, poke: 0.5, charge: 0.55},
-            hint: 'starts every round with the shield — blocking barely tires it; recovers stamina 25% faster'},
+            hint: 'starts every round with the shield — blocking barely shakes it'},
   spear:   {key: 'spear',   label: 'SPEAR',   weapon: 'spear', shield: false,
             body: {r: 26, hp: 100, move: 1,    dashV: 1,   dashStam: 1,    dashBal: 1,    stamRegen: 1,    shieldStam: 1},
             ai: {aggression: 0.6,  dashiness: 1,   retreat: 1.0, seekPickup: 0.3,  range: 1.35, blockBias: 0, poke: 0.9},
@@ -405,7 +406,7 @@ function makeFencer(x, y, color, isAI) {
     r: 26, maxHealth: MAX_HEALTH,
     ups: {arms: 0, legs: 0, brain: 0},
     wobPhase: Math.random() * TAU,
-    health: MAX_HEALTH, stamina: MAX_STAMINA, balance: MAX_BALANCE,
+    health: MAX_HEALTH, balance: MAX_BALANCE,
     fallen: 0, iframes: 0, sinceHit: 99,
     dash: 0, dashX: 0, dashY: 0,
     hitThisSwing: false,
@@ -438,7 +439,7 @@ function resetFencerRound(f, x, y, facing) {
     th: facing, w: 0, base: facing, ext: 0, extVel: 0,
     burst: 0, bladeStun: 0, trails: segOffs(f).map(() => []), cogKX: 0, cogKY: 0,
     hasShield: !!(f.arch && f.arch.shield),
-    health: f.maxHealth, stamina: MAX_STAMINA, balance: MAX_BALANCE,
+    health: f.maxHealth, balance: MAX_BALANCE,
     fallen: 0, iframes: 0, sinceHit: 99, dash: 0,
     hitThisSwing: false,
     aiState: 'approach', aiTimer: 0, cut: null,
@@ -511,7 +512,7 @@ function getCss(name) { return getComputedStyle(document.documentElement).getPro
 
 // ---------- Input ----------
 const keys = {};
-let dashQueued = false, eQueued = false;
+let dashQueued = false, eQueued = false, pausedGame = false;
 addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === 'e' && !e.repeat) eQueued = true;
@@ -520,6 +521,8 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && running) {
     running = false;
     mouse.burstQueued = false;
+    // mid-game ESC is a PAUSE — the title offers RESUME
+    pausedGame = state === 'fight' || state === 'levelup' || state === 'round';
     showTitle();
   }
   if (e.key === ' ') {
@@ -575,11 +578,9 @@ function stepFencer(f, dt, intent, other) {
   f.sinceHit += dt; f.iframes -= dt;
   f.upT = (f.upT ?? 9) + dt;   // time since last standing up
 
-  // --- resources: the triad ---
-  const staminaRegen = STAMINA_REGEN * f.body.stamRegen * (f.health / f.maxHealth);
-  f.stamina = clamp(f.stamina + staminaRegen * dt, 0, MAX_STAMINA);
+  // --- resources: health gates balance — the wounded totter ---
   const inCombat = f.sinceHit < COMBAT_WINDOW;
-  const balRegen = (inCombat ? BALANCE_REGEN_COMBAT : BALANCE_REGEN_REST) * (f.stamina / MAX_STAMINA);
+  const balRegen = (inCombat ? BALANCE_REGEN_COMBAT : BALANCE_REGEN_REST) * (f.health / f.maxHealth);
   if (f.fallen <= 0) f.balance = clamp(f.balance + balRegen * dt, 0, MAX_BALANCE);
 
   // centre-of-gravity marker dynamics: the kick vector settles, the
@@ -593,7 +594,7 @@ function stepFencer(f, dt, intent, other) {
   }
   if (f.fallen > 0) {
     f.fallen -= dt;
-    if (f.fallen <= 0) { f.fallen = 0; f.balance = MAX_BALANCE * 0.5; f.stamina = Math.max(f.stamina, 30); f.upT = 0; }
+    if (f.fallen <= 0) { f.fallen = 0; f.balance = MAX_BALANCE * 0.5; f.upT = 0; }
     // limp physics only
     f.vx *= Math.exp(-6 * dt); f.vy *= Math.exp(-6 * dt);
     f.x += f.vx * dt; f.y += f.vy * dt;
@@ -629,11 +630,9 @@ function stepFencer(f, dt, intent, other) {
   // dash — it throws your weight. Stepping UNDER your lean (toward the
   // COG marker) is the recovery step: it restores balance and settles
   // the marker. Leaping against your lean costs extra.
-  const dashCost = DASH_COST * f.body.dashStam * legsCost(f);
-  if (intent.dash && f.dash <= 0 && f.stamina >= dashCost && mMag > 0) {
+  if (intent.dash && f.dash <= 0 && mMag > 0) {
     f.dash = DASH_T; f.dashX = mx; f.dashY = my;
     f.dashVel = DASH_V * f.body.dashV * legsDash(f);
-    f.stamina -= dashCost;
     const m0 = (1 - f.balance / MAX_BALANCE) * (f.r + 26);
     const ox = Math.cos(f.cogAng || 0) * m0 + (f.cogKX || 0);
     const oy = Math.sin(f.cogAng || 0) * m0 + (f.cogKY || 0);
@@ -667,9 +666,7 @@ function stepFencer(f, dt, intent, other) {
   const dB = wrapAngle(f.th - f.base);
   f.base = wrapAngle(f.base + clamp(dB, -BASE_RATE * dt, BASE_RATE * dt));
 
-  const burstCost = BURST_STAMINA * f.weapon.swingStam * armsCost(f);
-  if (intent.burst && f.stamina >= burstCost) {
-    f.stamina -= burstCost;
+  if (intent.burst) {
     const imp = BURST_IMPULSE * f.weapon.speed * armsSpd(f);
     let rotImpulse = clamp(wrapAngle(aimAng - f.th) * 6, -imp, imp);
     // muscles are weakest at the end of their range: driving the blade
@@ -681,7 +678,7 @@ function stepFencer(f, dt, intent, other) {
       // fighting your own momentum: the reversal wrenches you the way
       // the sword WAS going
       const tang = f.th + Math.sign(f.w) * Math.PI / 2;
-      drainBalance(f, Math.min(16, Math.abs(f.w) * 0.55 * f.weapon.swingBal) * armsCost(f), Math.cos(tang), Math.sin(tang));
+      drainBalance(f, Math.min(24, Math.abs(f.w) * 0.825 * f.weapon.swingBal) * armsCost(f), Math.cos(tang), Math.sin(tang));
     } else {
       drainBalance(f, BURST_BALANCE * 0.5 * f.weapon.swingBal * armsCost(f), Math.cos(aimAng), Math.sin(aimAng));
     }
@@ -1254,10 +1251,8 @@ function bladeVsBody(att, def, dt) {
         att.bladeCd = 0.14;
         const dxs = att.x - def.x, dys = att.y - def.y, dm = Math.hypot(dxs, dys) || 1;
         drainBalance(att, 4, dxs / dm, dys / dm);
-        drainBalance(def, 1.5, -dxs / dm, -dys / dm);
-        // absorbing a strike tires the shield arm — unless you're built for it
-        def.stamina = Math.max(0, def.stamina -
-          Math.min(15, tipSpeed(att) * 0.01) * def.body.shieldStam);
+        // absorbing a strike shakes the shield arm — unless you're built for it
+        drainBalance(def, 1.5 + Math.min(6, tipSpeed(att) * 0.004) * def.body.shieldStam, -dxs / dm, -dys / dm);
         sfx.thunk();
         sparkAt(bb0.tx, bb0.ty, getCss('--steel'), 8);
         hitstop = Math.max(hitstop, 0.04);
@@ -1294,8 +1289,8 @@ function bladeVsBody(att, def, dt) {
       att.extVel = Math.min(att.extVel, -40);
       if ((att.bladeCd || 0) <= 0) {
         att.bladeCd = 0.14;
-        def.stamina = Math.max(0, def.stamina -
-          Math.min(10, tipSpeed(att) * 0.008) * def.body.shieldStam);
+        const kx = def.x - hit.px, ky = def.y - hit.py, km = Math.hypot(kx, ky) || 1;
+        drainBalance(def, Math.min(5, tipSpeed(att) * 0.003) * def.body.shieldStam, kx / km, ky / km);
         sfx.thunk();
         sparkAt(hit.px, hit.py, getCss('--steel'), 5);
       }
@@ -1343,11 +1338,9 @@ function bladeVsBody(att, def, dt) {
   drainBalance(def, dmg * TAKEN_BALANCE_RATIO * att.weapon.give, hkx / hkm, hky / hkm);
   def.iframes = HIT_IFRAMES;
   def.sinceHit = 0; att.sinceHit = 0;
-  // striking is committing — but pressing the advantage should tire
-  // you, not fell you: a landed touch costs mostly WIND, with only a
-  // light forward nudge of your weight
+  // striking is committing — but pressing the advantage should never
+  // fell you: a landed touch is only a light forward nudge of weight
   drainBalance(att, HIT_BALANCE_COST, Math.cos(att.facing), Math.sin(att.facing));
-  att.stamina = Math.max(0, att.stamina - HIT_STAMINA_COST);
 
   if (wasStumbled) {
     // hit while stumbled: you're sent ROLLING a long way — and come up
@@ -1444,12 +1437,12 @@ function foeFelled(def) {
   const roomClear = !foes.some(g => !g.out && g.group === def.group);
   if (floorClear) {
     player.health = player.maxHealth;
-    player.stamina = MAX_STAMINA;
+    player.balance = MAX_BALANCE;
     spawnText(player.x, player.y - 84, 'FLOOR CLEAR', getCss('--health'), 1.8);
     sfx.touche();
   } else if (roomClear) {
-    player.stamina = MAX_STAMINA;
-    spawnText(player.x, player.y - 84, 'ROOM CLEAR', getCss('--stamina'), 1.4);
+    player.balance = MAX_BALANCE;
+    spawnText(player.x, player.y - 84, 'ROOM CLEAR', getCss('--balance'), 1.4);
   }
 }
 
@@ -1500,7 +1493,7 @@ function foeIntent(me, dt) {
   const angToPlayer = Math.atan2(dy, dx);
   me.aiTimer -= dt;
 
-  const lowBalance = me.balance < 32, lowStamina = me.stamina < 22;
+  const lowBalance = me.balance < 32;
   const playerHot = tipSpeed(player) > 420 || player.burst > 0;
 
   const ux = dx / (dist || 1), uy = dy / (dist || 1);
@@ -1539,11 +1532,11 @@ function foeIntent(me, dt) {
   // choose state (a committed fetch is sticky until the shield is taken)
   const sp = pickups.find(p => !p.taken && p.kind === 'shield');
   const fetchable = sp && !me.hasShield;
-  if (me.aiTimer <= 0 && !(me.aiState === 'fetch' && fetchable && !lowBalance && !lowStamina)) {
+  if (me.aiTimer <= 0 && !(me.aiState === 'fetch' && fetchable && !lowBalance)) {
     me.aiTimer = 0.25 + Math.random() * 0.3;
     // flee only while actually pressed, and never forever — a winded
     // fencer recovers in place at range, and a cornered one turns to fight
-    if ((lowBalance || lowStamina) && dist < reach * 1.6 && (me.retreatT || 0) < 2.5) me.aiState = 'retreat';
+    if (lowBalance && dist < reach * 1.6 && (me.retreatT || 0) < 2.5) me.aiState = 'retreat';
     else if (fetchable && dist > reach && Math.random() < A.seekPickup) me.aiState = 'fetch';
     else if (player.fallen > 0) me.aiState = 'punish';
     else if (A.charge && !A.blockBias && dist > reach * 1.1 && dist < reach * 3.2 &&
@@ -1619,13 +1612,13 @@ function foeIntent(me, dt) {
 
 // ---------- Dungeon generation: rooms and corridors on a tile grid ----------
 function genFloor() {
-  const gw = 54, gh = 38, C = DUNGEON_CELL;
+  const gw = 50, gh = 35, C = DUNGEON_CELL;
   WORLD.w = gw * C; WORLD.h = gh * C;
   const solid = Array.from({length: gh}, () => Array(gw).fill(true));
   const rooms = [];
   // every floor gets one GREAT HALL — vast, and always pillared
   for (let tries = 0; tries < 200 && !rooms.length; tries++) {
-    const w = 14 + (Math.random() * 4 | 0), h = 10 + (Math.random() * 4 | 0);
+    const w = 12 + (Math.random() * 3 | 0), h = 9 + (Math.random() * 3 | 0);
     const x = 1 + (Math.random() * (gw - w - 2) | 0), y = 1 + (Math.random() * (gh - h - 2) | 0);
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solid[j][i] = false;
     rooms.push({x, y, w, h, cx: (x + w / 2) * C, cy: (y + h / 2) * C, great: true});
@@ -1633,8 +1626,8 @@ function genFloor() {
   for (let tries = 0; tries < 900 && rooms.length < 7; tries++) {
     // mostly BIG empty halls — proper fencing floors, small rooms rare
     const big = Math.random() < 0.75;
-    const w = big ? 11 + (Math.random() * 7 | 0) : 5 + (Math.random() * 3 | 0);
-    const h = big ? 8 + (Math.random() * 6 | 0) : 4 + (Math.random() * 2 | 0);
+    const w = big ? 10 + (Math.random() * 5 | 0) : 5 + (Math.random() * 3 | 0);
+    const h = big ? 7 + (Math.random() * 4 | 0) : 4 + (Math.random() * 2 | 0);
     const x = 1 + (Math.random() * (gw - w - 2) | 0), y = 1 + (Math.random() * (gh - h - 2) | 0);
     if (rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y)) continue;
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solid[j][i] = false;
@@ -1671,7 +1664,7 @@ function genFloor() {
   // fence around and sight lines to break. Placed AFTER the corridors,
   // and free-standing, so connectivity can't be severed.
   for (const r of rooms) {
-    if (r.great || (r.w >= 11 && r.h >= 8 && Math.random() < 0.45)) {
+    if (r.great || (r.w >= 10 && r.h >= 7 && Math.random() < 0.45)) {
       const ix = Math.max(2, Math.round(r.w * 0.27));
       const iy = Math.max(2, Math.round(r.h * 0.27));
       for (const i of [r.x + ix, r.x + r.w - 1 - ix]) {
@@ -1856,7 +1849,7 @@ function buildFloor(depth) {
       ? {x: (bossRoom.x + bossRoom.w - 1.5) * DUNGEON_CELL, y: (bossRoom.y + bossRoom.h - 1.5) * DUNGEON_CELL}
       : null};
   // the diver persists between floors; the floor does not
-  const keep = {health: player.health, stamina: player.stamina, balance: player.balance,
+  const keep = {health: player.health, balance: player.balance,
                 weapon: player.weapon, hasShield: player.hasShield};
   resetFencerRound(player, entry.cx, entry.cy, 0);
   Object.assign(player, keep);
@@ -1962,7 +1955,6 @@ function dungeonUpdate(dt) {
     }
     if (!f.aggro) {
       f.health = Math.min(f.maxHealth, f.health + 30 * dt);
-      f.stamina = Math.min(MAX_STAMINA, f.stamina + 30 * dt);
     }
   }
   // resting heals, slowly — attrition is the dungeon's real weapon
@@ -2439,10 +2431,9 @@ function drawBar(x, y, w, h, frac, color, label) {
 function drawHUD() {
   const bw = Math.min(280, W * 0.3), bh = 16, gap = 6;
   // player (bottom left)
-  const yTop = H - 20 - (bh + gap) * 3;
+  const yTop = H - 20 - (bh + gap) * 2;
   let y = yTop;
   drawBar(20, y, bw, bh, player.health / player.maxHealth, getCss('--health'), 'HEALTH'); y += bh + gap;
-  drawBar(20, y, bw, bh, player.stamina / MAX_STAMINA, getCss('--stamina'), 'STAMINA'); y += bh + gap;
   drawBar(20, y, bw, bh, player.balance / MAX_BALANCE, getCss('--balance'), 'BALANCE');
   if (mode === 'dungeon') {
     const prev = player.level > 0 ? XP_LEVELS[player.level - 1] : 0;
@@ -2450,10 +2441,10 @@ function drawHUD() {
     const next = XP_LEVELS[Math.min(player.level, XP_LEVELS.length - 1)];
     drawBar(20, yTop - 14, bw, 7, capped ? 1 : (player.xp - prev) / (next - prev), getCss('--you'), '');
   }
-  // foes: a compact block each (health + stamina + balance) — in the
-  // dungeon, only whoever is currently hunting you
+  // foes: a compact block each (health + balance) — in the dungeon,
+  // only whoever is currently hunting you
   const shown = mode === 'dungeon' ? foes.filter(f => f.aggro && !f.out) : foes;
-  const blockH = (bh + gap) * 2 + bh - 6 + gap + 12;
+  const blockH = (bh + gap) + bh - 4 + gap + 12;
   let fy = H - 20 - blockH * shown.length + 12;
   shown.forEach((f, idx) => {
     const label = mode === 'dungeon' ? f.name
@@ -2465,8 +2456,7 @@ function drawHUD() {
       ctx.fillText(`${label} — DOWN`, W - 20 - bw + 6, fy + bh / 2);
     } else {
       drawBar(W - 20 - bw, fy, bw, bh, f.health / f.maxHealth, getCss('--health'), label);
-      drawBar(W - 20 - bw, fy + bh + gap, bw, bh - 6, f.stamina / MAX_STAMINA, getCss('--stamina'), '');
-      drawBar(W - 20 - bw, fy + bh + gap + bh - 6 + gap, bw, bh - 4, f.balance / MAX_BALANCE, getCss('--balance'), '');
+      drawBar(W - 20 - bw, fy + bh + gap, bw, bh - 4, f.balance / MAX_BALANCE, getCss('--balance'), '');
     }
     fy += blockH;
   });
@@ -2597,9 +2587,9 @@ function loop(tMs) {
       }
     }
 
-    // low-stamina panting: exertion, audible — thump plus a breath
-    if (!muted && player.stamina < 40 && player.fallen <= 0 && performance.now() > pulseNext) {
-      const urgency = 1 - player.stamina / 40;
+    // wounded panting: laboured breathing, audible — thump plus a breath
+    if (!muted && player.health < 50 && player.fallen <= 0 && performance.now() > pulseNext) {
+      const urgency = 1 - player.health / 50;
       ping(65, 0.2, {type: 'sine', gain: 0.1 + 0.12 * urgency, glide: 48});
       noiseBurst(0.14, {gain: 0.06 + 0.08 * urgency, freq: 750, q: 0.5, when: 0.05});
       pulseNext = performance.now() + (700 - 430 * urgency);
@@ -2676,6 +2666,7 @@ canvas.addEventListener('mousedown', e => {
       // permadeath: the run is over either way — back to the surface
       running = false;
       state = null;
+      pausedGame = false;
       showTitle();
     } else {
       newMatch();
@@ -2689,6 +2680,7 @@ canvas.addEventListener('mousedown', e => {
 timeScaleIdx = 2;
 function startGame(m) {
   mode = m;
+  pausedGame = false;
   practiceHits = 0; practiceBest = 0;
   document.getElementById('title').style.display = 'none';
   ac();
@@ -2708,8 +2700,18 @@ function startGame(m) {
 function showTitle() {
   document.getElementById('duelSetup').style.display = 'none';
   document.getElementById('btnRow').style.display = 'flex';
+  document.getElementById('resumeBtn').style.display = pausedGame ? 'inline-block' : 'none';
   document.getElementById('title').style.display = 'flex';
 }
+document.getElementById('resumeBtn').addEventListener('click', () => {
+  if (!pausedGame) return;
+  pausedGame = false;
+  document.getElementById('title').style.display = 'none';
+  ac();
+  running = true;
+  lastT = performance.now() / 1000;
+  requestAnimationFrame(loop);
+});
 document.getElementById('startBtn').addEventListener('click', () => startGame('dungeon'));
 document.getElementById('duelBtn').addEventListener('click', () => {
   document.getElementById('btnRow').style.display = 'none';

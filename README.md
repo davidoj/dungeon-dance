@@ -14,16 +14,15 @@ contact is resolved by a single impulse formula, so beats, binds, parries and
 presses all *emerge* rather than being scripted. Damage is the relative
 velocity of steel and flesh at the moment of contact.
 
-Under that sits the resource triad the whole design hangs on:
+Under that sits the resource pair the whole design hangs on:
 
-- **Health** caps how fast stamina regenerates.
-- **Stamina** caps how fast balance regenerates.
+- **Health** caps how fast balance regenerates — the wounded totter.
 - **Balance** is the tactical currency — spent by swinging, by being struck,
   by clashing blades, by dashing. At zero you stumble, and stumbling in the
   wrong company ends runs.
 
-So a wounded fencer tires, a tired fencer totters, and position — footwork —
-is how you spend less of all three than the other fencer does.
+So a wounded fencer totters, and position — footwork — is how you spend
+less of both than the other fencer does.
 
 ### The dive
 
@@ -53,7 +52,7 @@ Rules of the dungeon:
   level is a choice between **ARMS** (swing faster, swings cost less) and
   **LEGS** (walk faster, dash further, dashes cost less). There is no +12%
   damage in this game.
-- Clearing a room refills your stamina; clearing a floor refills your
+- Clearing a room steadies your balance; clearing a floor refills your
   health — the full clear beats rushing the stairs.
 - **Walls turn steel.** A swing that meets stone rebounds and staggers your
   blade — narrow corridors are thrust country, and backing a crowd into a

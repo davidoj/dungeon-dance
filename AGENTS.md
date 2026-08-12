@@ -17,11 +17,11 @@ Everything is in declaration order; these are the landmarks to search for:
 
 | Search for | What lives there |
 | --- | --- |
-| `Tunables` | global feel constants (movement, dash, burst, triad regen, damage) |
+| `Tunables` | global feel constants (movement, dash, burst, balance regen, damage) |
 | `const WEAPONS` | weapons as items: reach, inertia, speed, swing costs, carry weight |
 | `const ARCHETYPES` | a body + a carried weapon + an `ai` temperament, per fighter kind |
 | `armsSpd / legsMove …` | level-up multipliers (ARMS / LEGS stacks) |
-| `stepFencer` | biomechanics: the triad, movement, the blade spring, muscle impulses |
+| `stepFencer` | biomechanics: health-gated balance, movement, the blade spring, muscle impulses |
 | `segSegClosest` | the capsule-capsule primitive (Ericson §5.1.9) all blade contact runs on |
 | `pairCombat` | blade-vs-blade: swept capsule search, tip-tip instability, bind ejection, the unified impulse |
 | `bladeVsBody` | shields, presses, wounds, knockback, and the kill/XP/drop path |
@@ -44,7 +44,7 @@ ai: {aggression, dashiness, retreat, seekPickup, range, blockBias, poke, charge}
 ```
 
 - `aggression` — probability of choosing attack over strafe when in reach
-- `dashiness` — how freely it spends stamina on dashes (nimble ≈ 2.2)
+- `dashiness` — how freely it dashes (nimble ≈ 2.2)
 - `retreat` — how long it disengages after an exchange
 - `range` — preferred distance as a multiple of weapon reach (spear 1.35, brawler 0.8)
 - `blockBias` — shield-first play: guard, wait for the counter window
