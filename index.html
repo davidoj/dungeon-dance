@@ -340,6 +340,7 @@ const sfx = {
   touche()  { ping(660, 0.15, {gain: 0.1}); ping(880, 0.3, {gain: 0.1, when: 0.12}); },
   dash()    { noiseBurst(0.1, {gain: 0.08, freq: 1400, q: 0.8}); },
   thunk()   { noiseBurst(0.07, {gain: 0.28, freq: 900, q: 1.2}); ping(220, 0.18, {gain: 0.1, type: 'triangle', glide: 140}); },
+  deny()    { ping(120, 0.12, {gain: 0.14, type: 'square', glide: 80}); noiseBurst(0.05, {gain: 0.08, freq: 500, q: 1}); },
 };
 
 // ---------- Helpers ----------
@@ -545,14 +546,20 @@ function drainBalance(f, amount, kx, ky) {
   f.balance = Math.max(0, f.balance - eff);
   // feedback: the centre-of-gravity marker is KICKED as a 2D impulse in
   // the direction of the disturbance, and you hear the cost
+  // the kick is a NUDGE, not the state: capped well inside the rim so a
+  // single swing can't slam the marker to the edge — the persistent
+  // displacement (actual balance) is the honest signal
   if (kx !== undefined) {
     f.lastKickAng = Math.atan2(ky, kx);
-    f.cogKX = (f.cogKX || 0) + kx * eff * 1.1;
-    f.cogKY = (f.cogKY || 0) + ky * eff * 1.1;
+    f.cogKX = (f.cogKX || 0) + kx * eff * 0.4;
+    f.cogKY = (f.cogKY || 0) + ky * eff * 0.4;
   } else {
-    f.cogKX = (f.cogKX || 0) + Math.cos(f.lastKickAng || 0) * eff * 1.1;
-    f.cogKY = (f.cogKY || 0) + Math.sin(f.lastKickAng || 0) * eff * 1.1;
+    f.cogKX = (f.cogKX || 0) + Math.cos(f.lastKickAng || 0) * eff * 0.4;
+    f.cogKY = (f.cogKY || 0) + Math.sin(f.lastKickAng || 0) * eff * 0.4;
   }
+  const kcap = (f.r + 26) * 0.35;
+  const km = Math.hypot(f.cogKX, f.cogKY);
+  if (km > kcap) { f.cogKX *= kcap / km; f.cogKY *= kcap / km; }
   const now = performance.now();
   if (eff >= 5 && now - (f.lastBalSfx || 0) > 80) {
     f.lastBalSfx = now;
@@ -666,6 +673,7 @@ function stepFencer(f, dt, intent, other) {
   const dB = wrapAngle(f.th - f.base);
   f.base = wrapAngle(f.base + clamp(dB, -BASE_RATE * dt, BASE_RATE * dt));
 
+  f.swingRefusedT = Math.max(0, (f.swingRefusedT || 0) - dt);
   if (intent.burst) {
     const imp = BURST_IMPULSE * f.weapon.speed * armsSpd(f);
     let rotImpulse = clamp(wrapAngle(aimAng - f.th) * 6, -imp, imp);
@@ -674,18 +682,30 @@ function stepFencer(f, dt, intent, other) {
     // pulling back across the body is full strength
     const qNow = wrapAngle(f.th - f.base);
     if (rotImpulse * qNow > 0) rotImpulse *= 1 - 0.6 * clamp(Math.abs(qNow) / ROM, 0, 1);
-    if (rotImpulse * f.w < -2) {
-      // fighting your own momentum: the reversal wrenches you the way
-      // the sword WAS going
-      const tang = f.th + Math.sign(f.w) * Math.PI / 2;
-      drainBalance(f, Math.min(24, Math.abs(f.w) * 0.825 * f.weapon.swingBal) * armsCost(f), Math.cos(tang), Math.sin(tang));
+    const reversing = rotImpulse * f.w < -2;
+    const cost = (reversing
+      ? Math.min(24, Math.abs(f.w) * 0.825 * f.weapon.swingBal)
+      : BURST_BALANCE * 0.5 * f.weapon.swingBal) * armsCost(f);
+    if (f.balance <= cost * BALANCE_COST_MULT) {
+      // too spent to commit: the swing is REFUSED. You never stumble
+      // off your own attack — you just can't make it, and the ring
+      // flashes to say so.
+      f.swingRefusedT = 0.45;
+      sfx.deny();
     } else {
-      drainBalance(f, BURST_BALANCE * 0.5 * f.weapon.swingBal * armsCost(f), Math.cos(aimAng), Math.sin(aimAng));
+      if (reversing) {
+        // fighting your own momentum: the reversal wrenches you the
+        // way the sword WAS going
+        const tang = f.th + Math.sign(f.w) * Math.PI / 2;
+        drainBalance(f, cost, Math.cos(tang), Math.sin(tang));
+      } else {
+        drainBalance(f, cost, Math.cos(aimAng), Math.sin(aimAng));
+      }
+      f.w += rotImpulse;
+      f.burst = BURST_T;                  // refreshes — no lockout between clicks
+      f.hitThisSwing = false;
+      sfx.whoosh(0.7);
     }
-    f.w += rotImpulse;
-    f.burst = BURST_T;                    // refreshes — no lockout between clicks
-    f.hitThisSwing = false;
-    sfx.whoosh(0.7);
   }
   f.burst = Math.max(0, f.burst - dt);
 
@@ -2299,11 +2319,14 @@ function drawFencer(f) {
     const gy = f.y + oy + Math.cos(tS * 13 + f.wobPhase) * jit;
     const danger = Math.min(1, om / rim);
     // the support-base circle: the gauge's boundary — the X reaching it
-    // is the fall. Near the edge it burns red.
+    // is the fall. Near the edge it burns red; a REFUSED swing (too
+    // spent to commit) flashes it bright.
+    const refused = (f.swingRefusedT || 0) > 0;
     const hot = danger > 0.7;
-    ctx.strokeStyle = hot ? getCss('--health') : getCss('--balance');
-    ctx.globalAlpha = hot ? 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(tS * 22)) : 0.14;
-    ctx.lineWidth = hot ? 3 : 2;
+    ctx.strokeStyle = refused ? (Math.floor(tS * 18) % 2 === 0 ? '#FFFFFF' : getCss('--balance'))
+      : hot ? getCss('--health') : getCss('--balance');
+    ctx.globalAlpha = refused ? 0.85 : hot ? 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(tS * 22)) : 0.14;
+    ctx.lineWidth = refused ? 4 : hot ? 3 : 2;
     ctx.beginPath(); ctx.arc(f.x, f.y, rim, 0, TAU); ctx.stroke();
     ctx.globalAlpha = fallen ? 0.75 : 1;
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
