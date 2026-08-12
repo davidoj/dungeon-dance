@@ -86,6 +86,12 @@ perception lag were reverted.
 - **Balance drains only through `drainBalance`** — it feeds the COG marker,
   the audio, and the stumble trigger. Side-channel subtraction breaks the
   fall guarantee.
+- **The shield always stops steel.** Its rebound is physics; `bladeCd` may
+  only rate-limit presentation and costs (gating the whole rebound once let
+  blades drive through for ~8 frames after any clang). The arc is also
+  absolute cover via the contact-angle backstop in `bladeVsBody` —
+  point-blank spears used to worm past the chord segment once the hand was
+  inside the shield radius.
 - **Muscles cap drive speed, not contact speed.** The `wCap` clamp only binds
   when muscles are adding speed; impulse-launched blades may exceed it.
 - **Steel never ends a frame inside stone.** `bladeVsWalls` sweeps sub-frame

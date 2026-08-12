@@ -50,9 +50,12 @@ Rules of the dungeon:
   arms barely feel it. A quickblade is the opposite bargain — light and fast,
   but every clash wrenches *you*.
 - **Level-ups grow capability, never numbers.** Kills bank experience; each
-  level is a choice between **ARMS** (swing faster, swings cost less) and
-  **LEGS** (walk faster, dash further, dashes cost less). There is no +12%
+  level is a choice between **ARMS** (swing faster, swings cost less),
+  **LEGS** (walk faster, dash further, dashes cost less) and **BRAIN** (the
+  world runs 5% slower to your eyes — max 2 stacks). There is no +12%
   damage in this game.
+- Clearing a room refills your stamina; clearing a floor refills your
+  health — the full clear beats rushing the stairs.
 - **Walls turn steel.** A swing that meets stone rebounds and staggers your
   blade — narrow corridors are thrust country, and backing a crowd into a
   doorway so they come one at a time is the oldest roguelike trick made

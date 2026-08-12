@@ -52,7 +52,15 @@
   .archBtn:focus-visible { outline: 2px solid var(--sun, #FFC44D); outline-offset: 2px; }
   #archHint { color: var(--dim); font-size: 0.9rem; min-height: 1.2em; }
   #btnRow { display: flex; gap: 18px; }
-  #startBtn, #duelBtn, #practiceBtn {
+  #duelSetup { display: none; flex-direction: column; gap: 14px; align-items: center; }
+  #duelGo { display: flex; gap: 14px; margin-top: 6px; align-items: center; }
+  #backBtn {
+    font-family: inherit; font-size: 0.85rem; letter-spacing: 0.12em;
+    padding: 10px 22px; background: none; border: 1px solid var(--dim);
+    color: var(--dim); border-radius: 4px; cursor: pointer;
+  }
+  #backBtn:hover { border-color: var(--steel); color: var(--steel); }
+  #startBtn, #duelBtn, #practiceBtn, #engardeBtn {
     font-family: inherit; font-size: 1.15rem; letter-spacing: 0.2em; text-indent: 0.2em;
     background: none; color: var(--balance);
     border: 1px solid var(--balance); border-radius: 4px;
@@ -60,8 +68,8 @@
     transition: background 0.15s, color 0.15s;
   }
   #startBtn:hover, #startBtn:focus-visible { background: var(--balance); color: #10251F; outline: none; }
-  #duelBtn { color: var(--you); border-color: var(--you); }
-  #duelBtn:hover, #duelBtn:focus-visible { background: var(--you); color: #101825; outline: none; }
+  #duelBtn, #engardeBtn { color: var(--you); border-color: var(--you); }
+  #duelBtn:hover, #duelBtn:focus-visible, #engardeBtn:hover, #engardeBtn:focus-visible { background: var(--you); color: #101825; outline: none; }
   #practiceBtn { color: var(--stamina); border-color: var(--stamina); }
   #practiceBtn:hover, #practiceBtn:focus-visible { background: var(--stamina); color: #251D0E; outline: none; }
   #title .hint { color: var(--dim); font-size: 0.85rem; max-width: 60ch; line-height: 1.6; }
@@ -82,38 +90,44 @@
     <span class="k">T</span><span class="v">slow motion</span>
     <span class="k">M</span><span class="v">sound on/off</span>
   </div>
-  <div class="archRow">
-    <span class="rowLab">YOU</span>
-    <button class="archBtn selected" data-group="you" data-arch="classic">CLASSIC</button>
-    <button class="archBtn" data-group="you" data-arch="nimble">NIMBLE</button>
-    <button class="archBtn" data-group="you" data-arch="strong">STRONG</button>
-    <button class="archBtn" data-group="you" data-arch="bulwark">BULWARK</button>
-    <button class="archBtn" data-group="you" data-arch="spear">SPEAR</button>
-  </div>
-  <div class="archRow">
-    <span class="rowLab">FOE</span>
-    <button class="archBtn selected" data-group="foe" data-arch="random">RANDOM</button>
-    <button class="archBtn" data-group="foe" data-arch="classic">CLASSIC</button>
-    <button class="archBtn" data-group="foe" data-arch="nimble">NIMBLE</button>
-    <button class="archBtn" data-group="foe" data-arch="strong">STRONG</button>
-    <button class="archBtn" data-group="foe" data-arch="bulwark">BULWARK</button>
-    <button class="archBtn" data-group="foe" data-arch="spear">SPEAR</button>
-  </div>
-  <div class="archRow">
-    <span class="rowLab">FOES</span>
-    <button class="archBtn selected" data-count="1">1</button>
-    <button class="archBtn" data-count="2">2</button>
-  </div>
-  <div id="archHint">the baseline fencer</div>
   <div id="btnRow">
     <button id="startBtn">DESCEND</button>
     <button id="duelBtn">DUEL</button>
     <button id="practiceBtn">PRACTICE</button>
   </div>
+  <div id="duelSetup">
+    <div class="archRow">
+      <span class="rowLab">YOU</span>
+      <button class="archBtn selected" data-group="you" data-arch="classic">CLASSIC</button>
+      <button class="archBtn" data-group="you" data-arch="nimble">NIMBLE</button>
+      <button class="archBtn" data-group="you" data-arch="strong">STRONG</button>
+      <button class="archBtn" data-group="you" data-arch="bulwark">BULWARK</button>
+      <button class="archBtn" data-group="you" data-arch="spear">SPEAR</button>
+    </div>
+    <div class="archRow">
+      <span class="rowLab">FOE</span>
+      <button class="archBtn selected" data-group="foe" data-arch="random">RANDOM</button>
+      <button class="archBtn" data-group="foe" data-arch="classic">CLASSIC</button>
+      <button class="archBtn" data-group="foe" data-arch="nimble">NIMBLE</button>
+      <button class="archBtn" data-group="foe" data-arch="strong">STRONG</button>
+      <button class="archBtn" data-group="foe" data-arch="bulwark">BULWARK</button>
+      <button class="archBtn" data-group="foe" data-arch="spear">SPEAR</button>
+    </div>
+    <div class="archRow">
+      <span class="rowLab">FOES</span>
+      <button class="archBtn selected" data-count="1">1</button>
+      <button class="archBtn" data-count="2">2</button>
+    </div>
+    <div id="archHint">the baseline fencer</div>
+    <div id="duelGo">
+      <button id="engardeBtn">EN GARDE</button>
+      <button id="backBtn">BACK</button>
+    </div>
+  </div>
   <div class="hint">
     <em>DESCEND</em>: a 3-floor dive — critters, then a garrison, then the proving hall.
-    You start a plain fencer; weapons are loot, and level-ups grow your ARMS or LEGS.
-    Death ends the run. (The YOU / FOE rows above set up DUEL only.)
+    You start a plain fencer; weapons are loot, and level-ups grow your ARMS, LEGS
+    or BRAIN. Death ends the run.
     Blades <em>bounce</em> off each other, walls turn steel — narrow corridors are thrust
     country. Your <em>balance</em> is spent by bursts, clashes and taken hits — at zero
     you <em>stumble</em>. Stamina refills balance; health refills stamina.
@@ -207,6 +221,7 @@ const WEAPONS = {
 // level-ups buy CAPABILITY, never damage numbers — each stack multiplies
 const ARMS_SPEED = 1.12, ARMS_COST = 0.82;   // swing faster, swings cost less
 const LEGS_MOVE = 1.08, LEGS_DASH = 1.08, LEGS_COST = 0.82;
+const BRAIN_SLOW = 0.05, BRAIN_MAX = 2;      // the world runs 5% slower per stack, to your eyes
 function armsSpd(f)  { return Math.pow(ARMS_SPEED, f.ups?.arms || 0); }
 function armsCost(f) { return Math.pow(ARMS_COST,  f.ups?.arms || 0); }
 function legsMove(f) { return Math.pow(LEGS_MOVE,  f.ups?.legs || 0); }
@@ -384,7 +399,7 @@ function makeFencer(x, y, color, isAI) {
     body: ARCHETYPES.classic.body,
     weapon: WEAPONS.sword,
     r: 26, maxHealth: MAX_HEALTH,
-    ups: {arms: 0, legs: 0},
+    ups: {arms: 0, legs: 0, brain: 0},
     wobPhase: Math.random() * TAU,
     health: MAX_HEALTH, stamina: MAX_STAMINA, balance: MAX_BALANCE,
     fallen: 0, iframes: 0, sinceHit: 99,
@@ -454,7 +469,39 @@ function newMatch() {
   player.score = 0; foeTeamScore = 0;
   state = 'fight'; banner = null; bannerT = 0;
   particles = []; shakeT = 0; hitstop = 0;
-  pickups = [{x: W / 2, y: H / 2 - 130, kind: 'shield', taken: false}];
+  pickups = [];
+}
+
+// dress player and foes in the duel-menu selections (also the fix for
+// "click to fight again" forgetting them — the replay path must call
+// this too, not just startGame)
+function applyDuelSelections() {
+  applyArch(player, ARCHETYPES[selectedArch]);
+  player.hasShield = player.hasShield || player.arch.shield;
+  for (const f of foes) {
+    const pick = selectedFoeArch === 'random'
+      ? DUEL_ARCHS[Math.floor(Math.random() * DUEL_ARCHS.length)]
+      : selectedFoeArch;
+    applyArch(f, ARCHETYPES[pick]);
+    f.hasShield = f.hasShield || f.arch.shield;
+    if (mode === 'practice') f.hasShield = true;   // feel the block from the attacker's side
+  }
+}
+
+// the arena powerup: random, useful for the current loadout, and
+// randomly placed
+function newDuelPickup() {
+  const pool = [];
+  if (!(player && player.hasShield)) pool.push('shield');
+  for (const wk of ['quick', 'heavy', 'spear']) {
+    if (!player || player.weapon.key !== wk) pool.push(wk);
+  }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const px = W * (0.2 + Math.random() * 0.6);
+  const py = H * (0.18 + Math.random() * 0.64);
+  pickups = [pick === 'shield'
+    ? {x: px, y: py, kind: 'shield', taken: false}
+    : {x: px, y: py, kind: 'weapon', weapon: pick, taken: false}];
 }
 function getCss(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
@@ -469,7 +516,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && running) {
     running = false;
     mouse.burstQueued = false;
-    document.getElementById('title').style.display = 'flex';
+    showTitle();
   }
   if (e.key === ' ') {
     e.preventDefault();
@@ -1177,15 +1224,29 @@ function bladeVsBody(att, def, dt) {
       }
     }
     if (sT !== null) {
-      if ((att.bladeCd || 0) <= 0) {
-        const t0 = Math.max(0, sT - 1 / 6);
-        att.th = wrapAngle((att.prevTh ?? att.th) + wrapAngle(att.th - (att.prevTh ?? att.th)) * t0);
-        att.ext = (att.prevExt ?? att.ext) + (att.ext - (att.prevExt ?? att.ext)) * t0;
-        // a shield is RIGID: near-full rebound, and the flung blade is
-        // staggered so it flies wide and stays wide
+      // the shield ALWAYS stops steel — bladeCd only rate-limits the
+      // presentation and the costs. (It used to gate the whole rebound,
+      // so for a few frames after any clang the shield had no physics
+      // at all and blades drove straight through it.)
+      const t0 = Math.max(0, sT - 1 / 6);
+      const bb0 = bladeOf(att, sOff);
+      const tv = bladePointVel(att, bb0.tx, bb0.ty);
+      const ddx0 = def.x - bb0.tx, ddy0 = def.y - bb0.ty;
+      const dm0 = Math.hypot(ddx0, ddy0) || 1;
+      const closingSpd = (tv.x * ddx0 + tv.y * ddy0) / dm0;
+      att.th = wrapAngle((att.prevTh ?? att.th) + wrapAngle(att.th - (att.prevTh ?? att.th)) * t0);
+      att.ext = (att.prevExt ?? att.ext) + (att.ext - (att.prevExt ?? att.ext)) * t0;
+      if (closingSpd > 60) {
+        // a real strike: RIGID rebound, the flung blade staggered wide
         att.w = -(Math.abs(att.w) * 0.95 + 3) * Math.sign(att.w || 1);
         att.bladeStun = Math.max(att.bladeStun, 0.35);
         att.extVel = Math.min(att.extVel, -80);
+      } else {
+        // resting steel on the shield face: it simply holds
+        att.w *= 0.8;
+        att.extVel = Math.min(att.extVel, 0);
+      }
+      if ((att.bladeCd || 0) <= 0 && closingSpd > 60) {
         att.bladeCd = 0.14;
         const dxs = att.x - def.x, dys = att.y - def.y, dm = Math.hypot(dxs, dys) || 1;
         drainBalance(att, 4, dxs / dm, dys / dm);
@@ -1193,9 +1254,8 @@ function bladeVsBody(att, def, dt) {
         // absorbing a strike tires the shield arm — unless you're built for it
         def.stamina = Math.max(0, def.stamina -
           Math.min(15, tipSpeed(att) * 0.01) * def.body.shieldStam);
-        const bb = bladeOf(att, sOff);
         sfx.thunk();
-        sparkAt(bb.tx, bb.ty, getCss('--steel'), 8);
+        sparkAt(bb0.tx, bb0.ty, getCss('--steel'), 8);
         hitstop = Math.max(hitstop, 0.04);
       }
       return;   // the shield stands between blade and body
@@ -1218,6 +1278,25 @@ function bladeVsBody(att, def, dt) {
   if (walls.length) {
     const hb = bladeOf(att, hOff);
     if (!losClear(hb.hx, hb.hy, hit.px, hit.py)) return;
+  }
+  // the shield's arc is absolute cover: any body touch whose contact
+  // angle falls inside it is a block, however the steel threaded the
+  // geometry — point-blank spears used to worm past the chord segment
+  // once the attacker's hand was already inside the shield radius
+  if (def.hasShield && def.fallen <= 0) {
+    const hAng = Math.atan2(hit.py - def.y, hit.px - def.x);
+    if (Math.abs(wrapAngle(hAng - (def.facing + SHIELD_OFF))) <= SHIELD_HALF + 0.08) {
+      att.w *= 0.6;
+      att.extVel = Math.min(att.extVel, -40);
+      if ((att.bladeCd || 0) <= 0) {
+        att.bladeCd = 0.14;
+        def.stamina = Math.max(0, def.stamina -
+          Math.min(10, tipSpeed(att) * 0.008) * def.body.shieldStam);
+        sfx.thunk();
+        sparkAt(hit.px, hit.py, getCss('--steel'), 5);
+      }
+      return;
+    }
   }
 
   // damage is decided by the RELATIVE velocity at the contact point —
@@ -1640,7 +1719,7 @@ function flowDir(x, y, field, away) {
 function spawnFoe(archKey, x, y, opts = {}) {
   const f = makeFencer(x, y, getCss('--foe'), true);
   applyArch(f, ARCHETYPES[archKey]);
-  f.ups = {arms: opts.arms || 0, legs: opts.legs || 0};
+  f.ups = {arms: opts.arms || 0, legs: opts.legs || 0, brain: opts.brain || 0};
   if (opts.hp) f.maxHealth = opts.hp;
   resetFencerRound(f, x, y, opts.facing ?? Math.random() * TAU);
   f.name = opts.name || f.arch.label;
@@ -1661,7 +1740,17 @@ function roomSpot(r) {
 }
 
 function castFloor(depth, mids, bossRoom) {
+  // loose loot: forged weapons lying in side rooms, worth a detour
+  const scatterLoot = (n) => {
+    const pool = ['quick', 'heavy', 'spear'];
+    for (let i = 0; i < n && mids.length; i++) {
+      const r = mids[Math.random() * mids.length | 0];
+      const [x, y] = roomSpot(r);
+      pickups.push({x, y, kind: 'weapon', weapon: pool[Math.random() * pool.length | 0], taken: false});
+    }
+  };
   if (depth === 1) {
+    scatterLoot(1);
     // the warrens: critters
     mids.forEach((r, i) => {
       const n = 1 + (Math.random() < 0.5 ? 1 : 0);
@@ -1678,6 +1767,7 @@ function castFloor(depth, mids, bossRoom) {
     }
   } else if (depth === 2) {
     // the garrison: lightly armed fencers
+    scatterLoot(2);
     mids.forEach((r, i) => {
       const [x, y] = roomSpot(r);
       spawnFoe('classic', x, y, {group: 'r' + i, name: 'GUARD'});
@@ -1691,6 +1781,7 @@ function castFloor(depth, mids, bossRoom) {
     }
   } else {
     // the proving hall: armed, upgraded, and they drop what they carry
+    scatterLoot(1);
     const pool = ['nimble', 'strong', 'bulwark', 'spear'];
     mids.forEach((r, i) => {
       const key = pool[i % pool.length];
@@ -1744,7 +1835,7 @@ function buildFloor(depth) {
 function buildRun() {
   player = makeFencer(0, 0, getCss('--you'), false);
   applyArch(player, ARCHETYPES.classic);
-  player.xp = 0; player.level = 0; player.ups = {arms: 0, legs: 0};
+  player.xp = 0; player.level = 0; player.ups = {arms: 0, legs: 0, brain: 0};
   pendingLevels = 0;
   resetFencerRound(player, 0, 0, 0);
   buildFloor(1);
@@ -1763,6 +1854,18 @@ function dungeonIntent(me, dt) {
       const field = flowTo(Math.floor(player.x / DUNGEON_CELL), Math.floor(player.y / DUNGEON_CELL));
       const dir = flowDir(me.x, me.y, field, !closing);
       if (dir) { i.moveX = dir.x * mm; i.moveY = dir.y * mm; i.dash = false; }
+    }
+    // early-floor discipline: a routed guard falls back toward its own
+    // post, never flees into the next room dragging fresh trouble in —
+    // deserting is a proving-hall habit
+    if (me.aiState === 'retreat' && dungeon && dungeon.depth < FLOOR_COUNT) {
+      const pdx = me.post.x - me.x, pdy = me.post.y - me.y;
+      const pd = Math.hypot(pdx, pdy);
+      if (pd > 260) {
+        const mm2 = Math.hypot(i.moveX, i.moveY) || 1;
+        i.moveX = (pdx / pd) * mm2; i.moveY = (pdy / pd) * mm2;
+        i.dash = false;
+      }
     }
     return i;
   }
@@ -1829,21 +1932,6 @@ function dungeonUpdate(dt) {
   if (player.sinceHit > 6 && player.fallen <= 0) {
     player.health = Math.min(player.maxHealth, player.health + 2.5 * dt);
   }
-  // a weapon on the floor: E takes it, your old one drops where you stand
-  if (eQueued) {
-    const near = pickups.find(p => !p.taken && p.kind === 'weapon' &&
-      Math.hypot(p.x - player.x, p.y - player.y) < player.r + 26);
-    if (near) {
-      if (!player.weapon.natural) {
-        pickups.push({x: player.x, y: player.y, kind: 'weapon', weapon: player.weapon.key, taken: false});
-      }
-      player.weapon = WEAPONS[near.weapon];
-      player.trails = segOffs(player).map(() => []);
-      near.taken = true;
-      spawnText(player.x, player.y - 50, player.weapon.label, getCss('--steel'), 1.3);
-      sfx.touche();
-    }
-  }
   // the stairs down
   if (dungeon.stairs && state === 'fight' &&
       Math.hypot(player.x - dungeon.stairs.x, player.y - dungeon.stairs.y) < 34) {
@@ -1857,7 +1945,26 @@ function dungeonUpdate(dt) {
   }
 }
 
+// a weapon on the floor: E takes it, your old one drops where you stand
+// (works in every mode — the duel powerup can be a weapon too)
+function tryWeaponSwap() {
+  if (!eQueued) return;
+  const near = pickups.find(p => !p.taken && p.kind === 'weapon' &&
+    Math.hypot(p.x - player.x, p.y - player.y) < player.r + 26);
+  if (near) {
+    if (!player.weapon.natural) {
+      pickups.push({x: player.x, y: player.y, kind: 'weapon', weapon: player.weapon.key, taken: false});
+    }
+    player.weapon = WEAPONS[near.weapon];
+    player.trails = segOffs(player).map(() => []);
+    near.taken = true;
+    spawnText(player.x, player.y - 50, player.weapon.label, getCss('--steel'), 1.3);
+    sfx.touche();
+  }
+}
+
 function applyLevelPick(kind) {
+  if (kind === 'brain' && player.ups.brain >= BRAIN_MAX) return;
   player.ups[kind]++;
   pendingLevels--;
   spawnText(player.x, player.y - 50, kind === 'arms' ? 'ARMS +1' : 'LEGS +1', getCss('--balance'), 1.4);
@@ -2002,15 +2109,16 @@ function drawLevelup() {
   ctx.font = '13px ui-monospace, Menlo, monospace';
   ctx.fillStyle = getCss('--dim');
   ctx.fillText('training shapes the body — pick what grows', W / 2, H / 2 - 100);
-  const bw = Math.min(260, W * 0.36), bh = 130, gap = 30;
+  const kinds = ['arms', 'legs'];
+  if (player.ups.brain < BRAIN_MAX) kinds.push('brain');
+  const bw = Math.min(230, W * 0.28), bh = 130, gap = 22;
+  const total = kinds.length * bw + (kinds.length - 1) * gap;
   const y0 = H / 2 - 50;
-  levelBtns = [
-    {x: W / 2 - bw - gap / 2, y: y0, w: bw, h: bh, kind: 'arms'},
-    {x: W / 2 + gap / 2, y: y0, w: bw, h: bh, kind: 'legs'},
-  ];
+  levelBtns = kinds.map((kind, i) => ({x: W / 2 - total / 2 + i * (bw + gap), y: y0, w: bw, h: bh, kind}));
   const descs = {
     arms: ['ARMS', 'swing 12% faster', 'swings cost 18% less', `now ${player.ups.arms}`],
     legs: ['LEGS', 'walk 8% faster · dash 8% further', 'dashes cost 18% less', `now ${player.ups.legs}`],
+    brain: ['BRAIN', 'the world runs 5% slower', `to your eyes (max ${BRAIN_MAX})`, `now ${player.ups.brain}`],
   };
   for (const b of levelBtns) {
     const hov = mouse.x >= b.x && mouse.x <= b.x + b.w && mouse.y >= b.y && mouse.y <= b.y + b.h;
@@ -2338,7 +2446,7 @@ function drawHUD() {
     ctx.fillText(`FLOOR ${dungeon.depth} — ${FLOOR_NAMES[dungeon.depth]}`, W / 2, 18);
     ctx.fillStyle = getCss('--dim');
     ctx.font = '12px ui-monospace, Menlo, monospace';
-    ctx.fillText(`LV ${player.level} · ARMS ${player.ups.arms} · LEGS ${player.ups.legs} · ` +
+    ctx.fillText(`LV ${player.level} · ARMS ${player.ups.arms} · LEGS ${player.ups.legs} · BRAIN ${player.ups.brain} · ` +
       `${player.weapon.label}${player.hasShield ? ' + SHIELD' : ''} · ESC — surface`, W / 2, 40);
   } else {
     ctx.font = '22px ui-monospace, Menlo, monospace';
@@ -2406,6 +2514,10 @@ function loop(tMs) {
   let dt = Math.min(0.033, t - lastT || 0.016);
   lastT = t;
   dt *= TIME_SCALES[timeScaleIdx];
+  // BRAIN: a trained mind sees the world run a touch slower
+  if (mode === 'dungeon' && player && player.ups.brain) {
+    dt *= 1 - BRAIN_SLOW * Math.min(BRAIN_MAX, player.ups.brain);
+  }
 
   if (hitstop > 0) { hitstop -= dt; dt *= 0.12; }   // impact freeze
 
@@ -2430,6 +2542,7 @@ function loop(tMs) {
       stepFencer(f, dt, intent, player);
     }
     resolveCombat(dt);
+    tryWeaponSwap();
     if (mode === 'dungeon' && state === 'fight') dungeonUpdate(dt);
 
     // shield pickup: first fencer to step on it takes it (in the
@@ -2464,6 +2577,9 @@ function loop(tMs) {
         state = 'over';
       } else {
         banner = null;
+        // each round starts on your archetype's own kit
+        player.weapon = WEAPONS[player.arch.weapon];
+        for (const f of foes) f.weapon = WEAPONS[f.arch.weapon];
         resetFencerRound(player, W * 0.32, H * 0.55, 0);
         const ys = foes.length > 1 ? [0.38, 0.72] : [0.55];
         foes.forEach((f, idx) => {
@@ -2471,7 +2587,7 @@ function loop(tMs) {
           f.postX = f.x; f.postY = f.y;
           f.out = false;
         });
-        pickups = [{x: W / 2, y: H / 2 - 130, kind: 'shield', taken: false}];
+        newDuelPickup();
         state = 'fight';
       }
     }
@@ -2525,9 +2641,11 @@ canvas.addEventListener('mousedown', e => {
       // permadeath: the run is over either way — back to the surface
       running = false;
       state = null;
-      document.getElementById('title').style.display = 'flex';
+      showTitle();
     } else {
       newMatch();
+      applyDuelSelections();
+      newDuelPickup();
     }
   }
 });
@@ -2544,24 +2662,25 @@ function startGame(m) {
     buildRun();      // the dive: you descend a plain CLASSIC and loot the rest
   } else {
     newMatch();
-    // archetypes: you pick yours; each foe draws independently on RANDOM
-    applyArch(player, ARCHETYPES[selectedArch]);
-    player.hasShield = player.hasShield || player.arch.shield;
-    for (const f of foes) {
-      const pick = selectedFoeArch === 'random'
-        ? DUEL_ARCHS[Math.floor(Math.random() * DUEL_ARCHS.length)]
-        : selectedFoeArch;
-      applyArch(f, ARCHETYPES[pick]);
-      f.hasShield = f.hasShield || f.arch.shield;
-      if (mode === 'practice') f.hasShield = true;   // feel the block from the attacker's side
-    }
+    applyDuelSelections();
+    newDuelPickup();
   }
   running = true;
   lastT = performance.now() / 1000;
   requestAnimationFrame(loop);
 }
+function showTitle() {
+  document.getElementById('duelSetup').style.display = 'none';
+  document.getElementById('btnRow').style.display = 'flex';
+  document.getElementById('title').style.display = 'flex';
+}
 document.getElementById('startBtn').addEventListener('click', () => startGame('dungeon'));
-document.getElementById('duelBtn').addEventListener('click', () => startGame('duel'));
+document.getElementById('duelBtn').addEventListener('click', () => {
+  document.getElementById('btnRow').style.display = 'none';
+  document.getElementById('duelSetup').style.display = 'flex';
+});
+document.getElementById('backBtn').addEventListener('click', showTitle);
+document.getElementById('engardeBtn').addEventListener('click', () => startGame('duel'));
 document.getElementById('practiceBtn').addEventListener('click', () => startGame('practice'));
 
 for (const btn of document.querySelectorAll('.archBtn[data-count]')) {
