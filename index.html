@@ -602,8 +602,21 @@ function stepFencer(f, dt, intent, other) {
   if (f.fallen > 0) {
     f.fallen -= dt;
     if (f.fallen <= 0) { f.fallen = 0; f.balance = MAX_BALANCE * 0.5; f.upT = 0; }
-    // limp physics only
-    f.vx *= Math.exp(-6 * dt); f.vy *= Math.exp(-6 * dt);
+    // stumbling, not paralyzed: you can still stagger along at half
+    // pace — you just can't swing (the blade hangs limp)
+    let mx = intent.moveX, my = intent.moveY;
+    const mMag = Math.hypot(mx, my);
+    f.knockT = Math.max(0, (f.knockT || 0) - dt);
+    if (mMag > 0) {
+      mx /= mMag; my /= mMag;
+      f.vx += mx * MOVE_ACCEL * 0.6 * dt;
+      f.vy += my * MOVE_ACCEL * 0.6 * dt;
+      const cap = MOVE_MAX * f.body.move * f.weapon.walk * legsMove(f) * 0.5;
+      const sp2 = Math.hypot(f.vx, f.vy);
+      if (sp2 > cap && f.knockT <= 0) { f.vx *= cap / sp2; f.vy *= cap / sp2; }
+    } else {
+      f.vx *= Math.exp(-6 * dt); f.vy *= Math.exp(-6 * dt);
+    }
     f.x += f.vx * dt; f.y += f.vy * dt;
     f.w *= Math.exp(-8 * dt);
     f.th += f.w * dt;
