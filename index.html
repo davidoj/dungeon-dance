@@ -1619,15 +1619,22 @@ function foeIntent(me, dt) {
 
 // ---------- Dungeon generation: rooms and corridors on a tile grid ----------
 function genFloor() {
-  const gw = 46, gh = 32, C = DUNGEON_CELL;
+  const gw = 54, gh = 38, C = DUNGEON_CELL;
   WORLD.w = gw * C; WORLD.h = gh * C;
   const solid = Array.from({length: gh}, () => Array(gw).fill(true));
   const rooms = [];
-  for (let tries = 0; tries < 700 && rooms.length < 7; tries++) {
-    // mostly BIG empty halls — small rooms are the rarity
+  // every floor gets one GREAT HALL — vast, and always pillared
+  for (let tries = 0; tries < 200 && !rooms.length; tries++) {
+    const w = 14 + (Math.random() * 4 | 0), h = 10 + (Math.random() * 4 | 0);
+    const x = 1 + (Math.random() * (gw - w - 2) | 0), y = 1 + (Math.random() * (gh - h - 2) | 0);
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solid[j][i] = false;
+    rooms.push({x, y, w, h, cx: (x + w / 2) * C, cy: (y + h / 2) * C, great: true});
+  }
+  for (let tries = 0; tries < 900 && rooms.length < 7; tries++) {
+    // mostly BIG empty halls — proper fencing floors, small rooms rare
     const big = Math.random() < 0.75;
-    const w = big ? 8 + (Math.random() * 6 | 0) : 5 + (Math.random() * 3 | 0);
-    const h = big ? 6 + (Math.random() * 5 | 0) : 4 + (Math.random() * 2 | 0);
+    const w = big ? 11 + (Math.random() * 7 | 0) : 5 + (Math.random() * 3 | 0);
+    const h = big ? 8 + (Math.random() * 6 | 0) : 4 + (Math.random() * 2 | 0);
     const x = 1 + (Math.random() * (gw - w - 2) | 0), y = 1 + (Math.random() * (gh - h - 2) | 0);
     if (rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y)) continue;
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solid[j][i] = false;
@@ -1664,9 +1671,11 @@ function genFloor() {
   // fence around and sight lines to break. Placed AFTER the corridors,
   // and free-standing, so connectivity can't be severed.
   for (const r of rooms) {
-    if (r.w >= 8 && r.h >= 6 && Math.random() < 0.55) {
-      for (const i of [r.x + 2, r.x + r.w - 3]) {
-        for (const j of [r.y + 2, r.y + r.h - 3]) solid[j][i] = true;
+    if (r.great || (r.w >= 11 && r.h >= 8 && Math.random() < 0.45)) {
+      const ix = Math.max(2, Math.round(r.w * 0.27));
+      const iy = Math.max(2, Math.round(r.h * 0.27));
+      for (const i of [r.x + ix, r.x + r.w - 1 - ix]) {
+        for (const j of [r.y + iy, r.y + r.h - 1 - iy]) solid[j][i] = true;
       }
     }
   }
