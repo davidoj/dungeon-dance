@@ -1549,8 +1549,15 @@ function foeIntent(me, dt) {
   // flung wide, or they are down
   const counterWindow = player.balance < 45 || player.bladeStun > 0.1 || player.fallen > 0;
 
-  // choose state (a committed fetch is sticky until the shield is taken)
-  const sp = pickups.find(p => !p.taken && p.kind === 'shield');
+  // choose state (a committed fetch is sticky until the shield is taken).
+  // In the dungeon a guard only reaches for a shield lying in its OWN
+  // room — nobody marches across the floor for equipment.
+  const inRoom = (x, y, r) => x >= r.x * DUNGEON_CELL && x <= (r.x + r.w) * DUNGEON_CELL &&
+                              y >= r.y * DUNGEON_CELL && y <= (r.y + r.h) * DUNGEON_CELL;
+  const myRoom = (mode === 'dungeon' && me.post && dungeon)
+    ? dungeon.rooms.find(r => inRoom(me.post.x, me.post.y, r)) : null;
+  const sp = pickups.find(p => !p.taken && p.kind === 'shield' &&
+    (mode !== 'dungeon' || (myRoom && inRoom(p.x, p.y, myRoom))));
   const fetchable = sp && !me.hasShield;
   if (me.aiTimer <= 0 && !(me.aiState === 'fetch' && fetchable && !lowBalance)) {
     me.aiTimer = 0.25 + Math.random() * 0.3;
@@ -1899,7 +1906,7 @@ function dungeonIntent(me, dt) {
     // just presses into walls — follow the flow field around them.
     // (Closing states walk it downhill; retreats walk it uphill.)
     const mm = Math.hypot(i.moveX, i.moveY);
-    if (mm > 0.05 && gridInfo && !losClear(me.x, me.y, player.x, player.y)) {
+    if (mm > 0.05 && gridInfo && me.aiState !== 'fetch' && !losClear(me.x, me.y, player.x, player.y)) {
       const closing = (player.x - me.x) * i.moveX + (player.y - me.y) * i.moveY > 0;
       const field = flowTo(Math.floor(player.x / DUNGEON_CELL), Math.floor(player.y / DUNGEON_CELL));
       const dir = flowDir(me.x, me.y, field, !closing);
