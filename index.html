@@ -182,9 +182,9 @@ const W_MAX = 9, W_MAX_BURST = 26;      // muscle-drive speed caps (rad/s)
 const TRAIL_LIFE = 0.22;                // seconds a tip-trace point lasts
 
 const MAX_HEALTH = 100, MAX_BALANCE = 100;
-const BALANCE_COST_MULT = 2;            // EXPERIMENT: spikier balance — double costs...
-const BALANCE_REGEN_COMBAT = 40;        // ...and double recharge (× health fraction —
-const BALANCE_REGEN_REST = 100;         //     wounds slow your recovery; stamina is gone)
+const BALANCE_COST_MULT = 2;            // spikier balance: double costs...
+const BALANCE_REGEN_COMBAT = 60;        // ...and fast recharge, ×1.5 again (× health
+const BALANCE_REGEN_REST = 150;         //     fraction — wounds slow your recovery)
 const COMBAT_WINDOW = 3.0;
 
 const HIT_BALANCE_COST = 5;             // landing a hit nudges your weight — never fells you
